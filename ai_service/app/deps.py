@@ -7,7 +7,15 @@ from redis.asyncio import Redis
 from app.cache import JsonCache
 from app.config import get_settings
 from app.errors import UnauthorizedError
-from app.repositories import MenuRepository, OrderRepository, StockRepository
+from app.repositories import (
+    DashboardRepository,
+    ForecastRepository,
+    MenuRepository,
+    OrderRepository,
+    StockRepository,
+)
+from app.services.dashboard_service import DashboardService
+from app.services.forecast_service import ForecastService
 from app.services.order_service import OrderService
 from app.services.parse_service import ParseOrderService
 from app.services.stock_service import StockService
@@ -65,6 +73,28 @@ def get_order_service(
     dashboard_cache: JsonCache = Depends(get_dashboard_cache),
 ) -> OrderService:
     return OrderService(repository, stock_cache, dashboard_cache)
+
+
+def get_dashboard_repo(pool: asyncpg.Pool | None = Depends(get_pg_pool)) -> DashboardRepository:
+    return DashboardRepository(pool)
+
+
+def get_forecast_repo(pool: asyncpg.Pool | None = Depends(get_pg_pool)) -> ForecastRepository:
+    return ForecastRepository(pool)
+
+
+def get_dashboard_service(
+    repository: DashboardRepository = Depends(get_dashboard_repo),
+    stock_repository: StockRepository = Depends(get_stock_repo),
+    cache: JsonCache = Depends(get_dashboard_cache),
+) -> DashboardService:
+    return DashboardService(repository, stock_repository, cache)
+
+
+def get_forecast_service(
+    repository: ForecastRepository = Depends(get_forecast_repo),
+) -> ForecastService:
+    return ForecastService(repository)
 
 
 def require_internal_token(x_internal_token: str | None = Header(default=None)) -> None:

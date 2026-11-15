@@ -11,7 +11,7 @@ from app.cache import create_redis_client
 from app.config import get_settings
 from app.db import close_pool, create_pool
 from app.errors import AppError
-from app.routers import health, orders, stocks
+from app.routers import dashboard, forecasts, health, orders, stocks
 
 logger = logging.getLogger("bogana.ai_service")
 
@@ -102,6 +102,8 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(orders.router)
     app.include_router(stocks.router)
+    app.include_router(dashboard.router)
+    app.include_router(forecasts.router)
     app.add_exception_handler(AppError, handle_app_error)
     app.add_exception_handler(RequestValidationError, handle_validation_error)
     app.add_exception_handler(StarletteHTTPException, handle_http_exception)
