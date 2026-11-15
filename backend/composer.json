@@ -1,0 +1,22 @@
+{
+    "name": "bogana/backend",
+    "description": "Dashboard ERP F&B B2B Bogana (PHP 8.2)",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.2",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Bogana\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}
