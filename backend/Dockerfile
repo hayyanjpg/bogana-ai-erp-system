@@ -12,6 +12,6 @@ RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoload
 COPY . .
 
 COPY docker/000-default.conf /etc/apache2/sites-available/000-default.conf
-RUN a2enmod rewrite && a2ensite 000-default
+RUN a2enmod rewrite
 
 EXPOSE 80
