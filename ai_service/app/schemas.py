@@ -50,3 +50,24 @@ class HealthResponse(BaseModel):
     version: str
     checks: dict[str, Literal["ok", "degraded", "down"]]
     timestamp: datetime
+
+
+class StockItem(BaseModel):
+    id: int
+    sku: str
+    name: str
+    unit: str
+    stock_on_hand: float
+    reorder_point: float
+    unit_cost: float
+    status: Literal["ok", "low", "out"]
+
+
+class StockListResponse(BaseModel):
+    source: Literal["redis", "postgres"]
+    generated_at: datetime
+    items: list[StockItem]
+
+
+class StockDetailResponse(StockItem):
+    used_in_menus: list[str]
