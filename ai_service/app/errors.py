@@ -37,6 +37,10 @@ class BusinessRuleError(AppError):
     code = "BUSINESS_RULE_VIOLATION"
 
 
+class InsufficientStockError(BusinessRuleError):
+    code = "INSUFFICIENT_STOCK"
+
+
 class DependencyUnavailableError(AppError):
     status_code = 503
     code = "DEPENDENCY_UNAVAILABLE"
