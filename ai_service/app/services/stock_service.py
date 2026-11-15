@@ -87,6 +87,4 @@ class StockService:
     def _matches(ingredient: Ingredient, low_only: bool, category: str | None) -> bool:
         if category is not None and ingredient.category != category:
             return False
-        if low_only and stock_status(ingredient) == "ok":
-            return False
-        return True
+        return not (low_only and stock_status(ingredient) == "ok")
