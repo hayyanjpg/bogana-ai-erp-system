@@ -7,8 +7,9 @@ from redis.asyncio import Redis
 from app.cache import JsonCache
 from app.config import get_settings
 from app.errors import UnauthorizedError
-from app.repositories import MenuRepository
+from app.repositories import MenuRepository, StockRepository
 from app.services.parse_service import ParseOrderService
+from app.services.stock_service import StockService
 
 
 def get_pg_pool(request: Request) -> asyncpg.Pool | None:
@@ -32,6 +33,21 @@ def get_parse_order_service(
     cache: JsonCache = Depends(get_parse_cache),
 ) -> ParseOrderService:
     return ParseOrderService(menu_repo, cache)
+
+
+def get_stock_repo(pool: asyncpg.Pool | None = Depends(get_pg_pool)) -> StockRepository:
+    return StockRepository(pool)
+
+
+def get_stock_cache(client: Redis | None = Depends(get_redis_client)) -> JsonCache:
+    return JsonCache(client, "erp:stock:", ttl_seconds=60)
+
+
+def get_stock_service(
+    repository: StockRepository = Depends(get_stock_repo),
+    cache: JsonCache = Depends(get_stock_cache),
+) -> StockService:
+    return StockService(repository, cache)
 
 
 def require_internal_token(x_internal_token: str | None = Header(default=None)) -> None:
