@@ -109,3 +109,62 @@ class AllocateOrderResponse(BaseModel):
     allocated_at: datetime
     deductions: list[AllocationDeductionItem]
     invalidated_cache_keys: list[str]
+
+
+class DashboardOrders(BaseModel):
+    total: int
+    received: int
+    parsed: int
+    confirmed: int
+    short: int
+    qc_hold: int
+    fulfilled: int
+    parse_failed: int
+    cancelled: int
+
+
+class LowStockItem(BaseModel):
+    sku: str
+    name: str
+    stock_on_hand: float
+    reorder_point: float
+    status: Literal["ok", "low", "out"]
+
+
+class ShortOrderItem(BaseModel):
+    order_id: int
+    order_code: str
+    customer_name: str
+
+
+class TopMenuItem(BaseModel):
+    menu_sku: str
+    menu_name: str
+    ordered_qty: float
+
+
+class DashboardSummaryResponse(BaseModel):
+    date: date
+    source: Literal["redis", "postgres"]
+    generated_at: datetime
+    orders: DashboardOrders
+    revenue_forecast: float
+    low_stock: list[LowStockItem]
+    short_orders: list[ShortOrderItem]
+    top_menus: list[TopMenuItem]
+
+
+class ForecastItem(BaseModel):
+    menu_id: int
+    menu_sku: str
+    menu_name: str
+    forecast_date: date
+    forecast_qty: float
+    confidence: float
+
+
+class ForecastsResponse(BaseModel):
+    from_date: date
+    days: int
+    model_version: str
+    items: list[ForecastItem]

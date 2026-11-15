@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 
 @dataclass(frozen=True)
@@ -53,3 +53,36 @@ class AllocationResult:
     status: str
     allocated_at: datetime
     deductions: list[StockDeduction]
+
+
+@dataclass(frozen=True)
+class ShortOrder:
+    id: int
+    order_code: str
+    customer_name: str
+
+
+@dataclass(frozen=True)
+class TopMenu:
+    menu_sku: str
+    menu_name: str
+    ordered_qty: float
+
+
+@dataclass(frozen=True)
+class DashboardData:
+    date: date
+    status_counts: dict[str, int]
+    revenue: float
+    short_orders: list[ShortOrder]
+    top_menus: list[TopMenu]
+
+
+@dataclass(frozen=True)
+class ForecastRow:
+    menu_id: int
+    menu_sku: str
+    menu_name: str
+    forecast_date: date
+    forecast_qty: float
+    confidence: float
