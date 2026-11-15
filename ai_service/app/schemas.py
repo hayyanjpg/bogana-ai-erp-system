@@ -71,3 +71,41 @@ class StockListResponse(BaseModel):
 
 class StockDetailResponse(StockItem):
     used_in_menus: list[str]
+
+
+class StockRequirementItem(BaseModel):
+    ingredient_sku: str
+    ingredient_name: str
+    unit: str
+    required: float
+    available: float
+    shortage: float
+
+
+class CheckStockResponse(BaseModel):
+    order_id: int
+    order_code: str
+    sufficient: bool
+    checked_at: datetime
+    requirements: list[StockRequirementItem]
+    insufficient: list[StockRequirementItem]
+
+
+class AllocateOrderRequest(BaseModel):
+    expected_version: int | None = None
+
+
+class AllocationDeductionItem(BaseModel):
+    ingredient_sku: str
+    quantity: float
+    unit: str
+    stock_after: float
+
+
+class AllocateOrderResponse(BaseModel):
+    order_id: int
+    order_code: str
+    status: str
+    allocated_at: datetime
+    deductions: list[AllocationDeductionItem]
+    invalidated_cache_keys: list[str]
