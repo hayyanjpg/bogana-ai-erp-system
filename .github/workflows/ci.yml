@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php-lint:
+    name: PHP syntax (php -l)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+          coverage: none
+
+      - name: Lint all PHP files
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          files=(**/*.php)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "Tidak ada file PHP untuk dilint."
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            case "$f" in
+              vendor/*|node_modules/*) continue ;;
+            esac
+            php -l "$f"
+          done
+
+  python-lint:
+    name: Python lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "ruff>=0.6,<1.0"
+          if [ -f ai_service/requirements.txt ]; then
+            python -m pip install -r ai_service/requirements.txt
+          fi
+          if [ -f requirements-dev.txt ]; then
+            python -m pip install -r requirements-dev.txt
+          fi
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+  python-test:
+    name: Python test (pytest)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bogana
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bogana"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bogana
+      REDIS_URL: redis://localhost:6379/0
+      AI_SERVICE_AUTH_DISABLED: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-asyncio httpx
+          if [ -f ai_service/requirements.txt ]; then
+            python -m pip install -r ai_service/requirements.txt
+          fi
+          if [ -f requirements-dev.txt ]; then
+            python -m pip install -r requirements-dev.txt
+          fi
+
+      - name: Load schema into PostgreSQL
+        run: |
+          if command -v psql >/dev/null 2>&1; then
+            PGPASSWORD=postgres psql -h localhost -U postgres -d bogana -f database/schema.sql
+          else
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+            PGPASSWORD=postgres psql -h localhost -U postgres -d bogana -f database/schema.sql
+          fi
+
+      - name: Run pytest
+        run: |
+          if [ -d tests ] || [ -d ai_service/tests ]; then
+            pytest -q
+          else
+            echo "Belum ada test Python; dilewati."
+          fi
