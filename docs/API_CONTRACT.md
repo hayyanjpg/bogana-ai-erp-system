@@ -395,6 +395,10 @@ Agregat untuk dashboard PHP. Dilayani dari Redis `erp:dashboard:summary` (TTL 30
 - `revenue_forecast` = total `line_total` order berstatus `confirmed` + `fulfilled`
   pada tanggal tersebut.
 - `low_stock` hanya berisi bahan dengan `status` `low` atau `out`.
+- `top_menus` berisi maksimal 5 menu dengan `ordered_qty` terbesar pada tanggal
+  tersebut.
+- Cache `erp:dashboard:summary` hanya dipakai bila `date` di dalam cache sama
+  dengan `date` yang diminta; selain itu data diambil ulang dari PostgreSQL.
 
 ---
 
