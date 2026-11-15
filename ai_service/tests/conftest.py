@@ -4,14 +4,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.deps import (
+    get_dashboard_cache,
     get_menu_repo,
+    get_order_repo,
     get_parse_cache,
     get_pg_pool,
     get_redis_client,
     get_stock_cache,
     get_stock_repo,
 )
-from app.domain import Ingredient
+from app.domain import AllocationResult, Ingredient, OrderSnapshot
 from app.main import create_app
 from app.services.parser import MenuLite
 
@@ -111,6 +113,26 @@ class FakeStockRepository:
         return MENU_SKUS_BY_INGREDIENT.get(ingredient_id, [])
 
 
+class FakeOrderRepository:
+    def __init__(self) -> None:
+        self.snapshot: OrderSnapshot | None = None
+        self.allocation: AllocationResult | None = None
+        self.allocate_calls: list[tuple[int, int | None]] = []
+
+    async def get_snapshot(self, order_id: int) -> OrderSnapshot | None:
+        return self.snapshot
+
+    async def allocate(
+        self,
+        order_id: int,
+        expected_version: int | None,
+    ) -> AllocationResult:
+        self.allocate_calls.append((order_id, expected_version))
+        if self.allocation is None:
+            raise AssertionError("allocation belum disiapkan pada fake repository")
+        return self.allocation
+
+
 class FakeCache:
     def __init__(self) -> None:
         self.store: dict[str, Any] = {}
@@ -120,6 +142,9 @@ class FakeCache:
 
     async def set(self, key: str, payload: Any) -> None:
         self.store[key] = payload
+
+    async def delete(self, key: str) -> None:
+        self.store.pop(key, None)
 
 
 @pytest.fixture
@@ -133,7 +158,16 @@ def stock_cache() -> FakeCache:
 
 
 @pytest.fixture
-def client(cache: FakeCache, stock_cache: FakeCache) -> TestClient:
+def order_repo() -> FakeOrderRepository:
+    return FakeOrderRepository()
+
+
+@pytest.fixture
+def client(
+    cache: FakeCache,
+    stock_cache: FakeCache,
+    order_repo: FakeOrderRepository,
+) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_pg_pool] = lambda: FakePool()
     app.dependency_overrides[get_redis_client] = lambda: FakeRedis()
@@ -141,5 +175,7 @@ def client(cache: FakeCache, stock_cache: FakeCache) -> TestClient:
     app.dependency_overrides[get_parse_cache] = lambda: cache
     app.dependency_overrides[get_stock_repo] = lambda: FakeStockRepository(INGREDIENTS)
     app.dependency_overrides[get_stock_cache] = lambda: stock_cache
+    app.dependency_overrides[get_dashboard_cache] = lambda: stock_cache
+    app.dependency_overrides[get_order_repo] = lambda: order_repo
     with TestClient(app) as test_client:
         yield test_client
