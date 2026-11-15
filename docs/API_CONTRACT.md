@@ -341,6 +341,11 @@ Memotong `ingredients.stock_on_hand` dan mengubah status order
 - Stok tidak boleh menjadi negatif -> `422 BUSINESS_RULE_VIOLATION` dengan
   `error.code = "INSUFFICIENT_STOCK"`.
 - Order yang belum `confirmed` -> `409 CONFLICT`.
+- Order wajib memiliki minimal satu item -> `409 CONFLICT`.
+- Seluruh `order_items` wajib memiliki minimal satu `qc_logs` berstatus `pass`
+  (lihat `docs/PRD_ERP_FLOW.md` bagian 6) -> `409 CONFLICT` bila belum.
+- `expected_version` yang tidak cocok dengan versi order saat transaksi ->
+  `409 CONFLICT`.
 - Respons sukses wajib menyertakan daftar key cache yang diinvalidasi.
 
 ---
