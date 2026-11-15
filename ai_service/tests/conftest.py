@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any
 
 import pytest
@@ -5,6 +6,8 @@ from fastapi.testclient import TestClient
 
 from app.deps import (
     get_dashboard_cache,
+    get_dashboard_repo,
+    get_forecast_repo,
     get_menu_repo,
     get_order_repo,
     get_parse_cache,
@@ -13,7 +16,15 @@ from app.deps import (
     get_stock_cache,
     get_stock_repo,
 )
-from app.domain import AllocationResult, Ingredient, OrderSnapshot
+from app.domain import (
+    AllocationResult,
+    DashboardData,
+    ForecastRow,
+    Ingredient,
+    OrderSnapshot,
+    ShortOrder,
+    TopMenu,
+)
 from app.main import create_app
 from app.services.parser import MenuLite
 
@@ -83,6 +94,39 @@ MENU_SKUS_BY_INGREDIENT = {
     2: ["MNU-NBG-01", "MNU-NBG-02"],
 }
 
+DASHBOARD_DATA = DashboardData(
+    date=date(2026, 11, 16),
+    status_counts={"fulfilled": 1, "short": 1, "parsed": 1},
+    revenue=945000.0,
+    short_orders=(
+        ShortOrder(
+            id=2,
+            order_code="ORD-20261115-002",
+            customer_name="Katering Dapur Ibu Hana",
+        ),
+    ),
+    top_menus=(TopMenu(menu_sku="MNU-NBG-01", menu_name="Nasi Bogana Komplit", ordered_qty=40.0),),
+)
+
+FORECAST_ROWS = (
+    ForecastRow(
+        menu_id=1,
+        menu_sku="MNU-NBG-01",
+        menu_name="Nasi Bogana Komplit",
+        forecast_date=date(2026, 11, 16),
+        forecast_qty=46.0,
+        confidence=0.82,
+    ),
+    ForecastRow(
+        menu_id=2,
+        menu_sku="MNU-NBG-02",
+        menu_name="Nasi Bogana Ayam Kecap",
+        forecast_date=date(2026, 11, 16),
+        forecast_qty=38.0,
+        confidence=0.76,
+    ),
+)
+
 
 class FakePool:
     async def fetchval(self, query: str) -> int:
@@ -133,6 +177,36 @@ class FakeOrderRepository:
         return self.allocation
 
 
+class FakeDashboardRepository:
+    def __init__(self, data: DashboardData) -> None:
+        self.data = data
+        self.calls: list[date] = []
+
+    async def fetch(self, date_value: date) -> DashboardData:
+        self.calls.append(date_value)
+        return self.data
+
+
+class FakeForecastRepository:
+    def __init__(
+        self,
+        model_version: str,
+        rows: tuple[ForecastRow, ...],
+    ) -> None:
+        self.model_version = model_version
+        self.rows = rows
+        self.calls: list[tuple[date, date, int | None]] = []
+
+    async def list(
+        self,
+        from_date: date,
+        to_date: date,
+        menu_id: int | None,
+    ) -> tuple[str, list[ForecastRow]]:
+        self.calls.append((from_date, to_date, menu_id))
+        return self.model_version, list(self.rows)
+
+
 class FakeCache:
     def __init__(self) -> None:
         self.store: dict[str, Any] = {}
@@ -163,10 +237,22 @@ def order_repo() -> FakeOrderRepository:
 
 
 @pytest.fixture
+def dashboard_repo() -> FakeDashboardRepository:
+    return FakeDashboardRepository(DASHBOARD_DATA)
+
+
+@pytest.fixture
+def forecast_repo() -> FakeForecastRepository:
+    return FakeForecastRepository("bogana-forecast-v1", FORECAST_ROWS)
+
+
+@pytest.fixture
 def client(
     cache: FakeCache,
     stock_cache: FakeCache,
     order_repo: FakeOrderRepository,
+    dashboard_repo: FakeDashboardRepository,
+    forecast_repo: FakeForecastRepository,
 ) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_pg_pool] = lambda: FakePool()
@@ -177,5 +263,7 @@ def client(
     app.dependency_overrides[get_stock_cache] = lambda: stock_cache
     app.dependency_overrides[get_dashboard_cache] = lambda: stock_cache
     app.dependency_overrides[get_order_repo] = lambda: order_repo
+    app.dependency_overrides[get_dashboard_repo] = lambda: dashboard_repo
+    app.dependency_overrides[get_forecast_repo] = lambda: forecast_repo
     with TestClient(app) as test_client:
         yield test_client
