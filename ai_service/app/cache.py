@@ -48,3 +48,11 @@ class JsonCache:
             )
         except Exception:
             return
+
+    async def delete(self, key: str) -> None:
+        if self._client is None:
+            return
+        try:
+            await self._client.delete(self._prefix + key)
+        except Exception:
+            return
