@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+pythonpath = ["ai_service"]
+testpaths = ["ai_service/tests"]
+addopts = "-q"
