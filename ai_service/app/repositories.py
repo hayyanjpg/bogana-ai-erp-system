@@ -1,13 +1,17 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import asyncpg
 
 from app.domain import (
     AllocationResult,
+    DashboardData,
+    ForecastRow,
     Ingredient,
     OrderSnapshot,
+    ShortOrder,
     StockDeduction,
     StockRequirement,
+    TopMenu,
 )
 from app.errors import (
     ConflictError,
@@ -228,3 +232,130 @@ class OrderRepository:
                 allocated_at=datetime.now(UTC),
                 deductions=deductions,
             )
+
+
+class DashboardRepository:
+    def __init__(self, pool: asyncpg.Pool | None) -> None:
+        self._pool = pool
+
+    def _require_pool(self) -> asyncpg.Pool:
+        if self._pool is None:
+            raise DependencyUnavailableError("PostgreSQL tidak tersedia")
+        return self._pool
+
+    async def fetch(self, date_value: date) -> DashboardData:
+        pool = self._require_pool()
+
+        status_rows = await pool.fetch(
+            "SELECT status, COUNT(*) AS total FROM b2b_orders "
+            "WHERE order_date = $1 GROUP BY status",
+            date_value,
+        )
+        status_counts = {row["status"]: row["total"] for row in status_rows}
+
+        revenue = await pool.fetchval(
+            "SELECT COALESCE(SUM(oi.line_total), 0) FROM order_items oi "
+            "JOIN b2b_orders o ON o.id = oi.order_id "
+            "WHERE o.order_date = $1 AND o.status IN ('confirmed', 'fulfilled')",
+            date_value,
+        )
+
+        short_rows = await pool.fetch(
+            "SELECT id, order_code, customer_name FROM b2b_orders "
+            "WHERE order_date = $1 AND status = 'short' ORDER BY id",
+            date_value,
+        )
+
+        top_rows = await pool.fetch(
+            "SELECT m.sku AS menu_sku, m.name AS menu_name, "
+            "SUM(oi.quantity) AS ordered_qty FROM order_items oi "
+            "JOIN b2b_orders o ON o.id = oi.order_id "
+            "JOIN menus m ON m.id = oi.menu_id "
+            "WHERE o.order_date = $1 "
+            "GROUP BY m.sku, m.name "
+            "ORDER BY ordered_qty DESC, m.sku ASC LIMIT 5",
+            date_value,
+        )
+
+        return DashboardData(
+            date=date_value,
+            status_counts=status_counts,
+            revenue=float(revenue or 0),
+            short_orders=[
+                ShortOrder(
+                    id=row["id"],
+                    order_code=row["order_code"],
+                    customer_name=row["customer_name"],
+                )
+                for row in short_rows
+            ],
+            top_menus=[
+                TopMenu(
+                    menu_sku=row["menu_sku"],
+                    menu_name=row["menu_name"],
+                    ordered_qty=float(row["ordered_qty"]),
+                )
+                for row in top_rows
+            ],
+        )
+
+
+class ForecastRepository:
+    def __init__(self, pool: asyncpg.Pool | None) -> None:
+        self._pool = pool
+
+    def _require_pool(self) -> asyncpg.Pool:
+        if self._pool is None:
+            raise DependencyUnavailableError("PostgreSQL tidak tersedia")
+        return self._pool
+
+    async def list(
+        self,
+        from_date: date,
+        to_date: date,
+        menu_id: int | None,
+    ) -> tuple[str, list[ForecastRow]]:
+        pool = self._require_pool()
+        model_version = await pool.fetchval(
+            "SELECT model_version FROM demand_forecasts ORDER BY created_at DESC, id DESC LIMIT 1"
+        )
+        if model_version is None:
+            return "", []
+
+        if menu_id is None:
+            rows = await pool.fetch(
+                "SELECT f.menu_id, m.sku AS menu_sku, m.name AS menu_name, "
+                "f.forecast_date, f.forecast_qty, f.confidence FROM demand_forecasts f "
+                "JOIN menus m ON m.id = f.menu_id "
+                "WHERE f.model_version = $1 "
+                "AND f.forecast_date >= $2 AND f.forecast_date < $3 "
+                "ORDER BY f.forecast_date ASC, f.menu_id ASC",
+                model_version,
+                from_date,
+                to_date,
+            )
+        else:
+            rows = await pool.fetch(
+                "SELECT f.menu_id, m.sku AS menu_sku, m.name AS menu_name, "
+                "f.forecast_date, f.forecast_qty, f.confidence FROM demand_forecasts f "
+                "JOIN menus m ON m.id = f.menu_id "
+                "WHERE f.model_version = $1 "
+                "AND f.forecast_date >= $2 AND f.forecast_date < $3 AND f.menu_id = $4 "
+                "ORDER BY f.forecast_date ASC, f.menu_id ASC",
+                model_version,
+                from_date,
+                to_date,
+                menu_id,
+            )
+
+        return model_version, [
+            ForecastRow(
+                menu_id=row["menu_id"],
+                menu_sku=row["menu_sku"],
+                menu_name=row["menu_name"],
+                forecast_date=row["forecast_date"],
+                forecast_qty=float(row["forecast_qty"]),
+                confidence=float(row["confidence"]),
+            )
+            for row in rows
+        ]
