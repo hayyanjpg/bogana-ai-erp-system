@@ -1,5 +1,7 @@
 from datetime import date, timedelta
 
+from app.config import get_settings
+
 
 def test_parse_order_contract_example(client):
     response = client.post(
@@ -103,3 +105,28 @@ def test_parse_order_is_cached(client):
     assert first.status_code == 200
     assert second.status_code == 200
     assert first.json()["parse_id"] == second.json()["parse_id"]
+
+
+def test_parse_order_requires_internal_token_when_auth_enabled(client, monkeypatch):
+    payload = {
+        "raw_text": "gan 8 nasi bogana komplit",
+        "channel": "manual",
+        "customer_name": "Warung Bu Sri",
+    }
+
+    monkeypatch.setenv("AI_SERVICE_AUTH_DISABLED", "false")
+    monkeypatch.setenv("AI_SERVICE_TOKEN", "secret-token")
+    get_settings.cache_clear()
+    try:
+        unauthorized = client.post("/v1/parse-order", json=payload)
+        assert unauthorized.status_code == 401
+        assert unauthorized.json()["error"]["code"] == "UNAUTHORIZED"
+
+        authorized = client.post(
+            "/v1/parse-order",
+            json=payload,
+            headers={"X-Internal-Token": "secret-token"},
+        )
+        assert authorized.status_code == 200
+    finally:
+        get_settings.cache_clear()
