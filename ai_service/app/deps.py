@@ -4,7 +4,7 @@ import asyncpg
 from fastapi import Depends, Header, Request
 from redis.asyncio import Redis
 
-from app.cache import ParseCache
+from app.cache import JsonCache
 from app.config import get_settings
 from app.errors import UnauthorizedError
 from app.repositories import MenuRepository
@@ -23,13 +23,13 @@ def get_menu_repo(pool: asyncpg.Pool | None = Depends(get_pg_pool)) -> MenuRepos
     return MenuRepository(pool)
 
 
-def get_parse_cache(client: Redis | None = Depends(get_redis_client)) -> ParseCache:
-    return ParseCache(client)
+def get_parse_cache(client: Redis | None = Depends(get_redis_client)) -> JsonCache:
+    return JsonCache(client, "erp:parse:", ttl_seconds=900)
 
 
 def get_parse_order_service(
     menu_repo: MenuRepository = Depends(get_menu_repo),
-    cache: ParseCache = Depends(get_parse_cache),
+    cache: JsonCache = Depends(get_parse_cache),
 ) -> ParseOrderService:
     return ParseOrderService(menu_repo, cache)
 

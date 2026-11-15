@@ -2,14 +2,14 @@ import hashlib
 from datetime import date, timedelta
 from uuid import uuid4
 
-from app.cache import ParseCache
+from app.cache import JsonCache
 from app.repositories import MenuRepository
 from app.schemas import ParsedItem, ParseOrderRequest, ParseOrderResponse, ParseWarning
 from app.services.parser import parse_order_text
 
 
 class ParseOrderService:
-    def __init__(self, menu_repo: MenuRepository, cache: ParseCache) -> None:
+    def __init__(self, menu_repo: MenuRepository, cache: JsonCache) -> None:
         self._menu_repo = menu_repo
         self._cache = cache
 
