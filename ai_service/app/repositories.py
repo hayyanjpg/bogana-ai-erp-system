@@ -4,10 +4,17 @@ import asyncpg
 
 from app.domain import (
     AllocationResult,
+    ConfirmResult,
     DashboardData,
     ForecastRow,
     Ingredient,
+    OrderDetail,
+    OrderItemRow,
     OrderSnapshot,
+    OrderSummaryRow,
+    QcRecordResult,
+    RestockResult,
+    SavedOrder,
     ShortOrder,
     StockDeduction,
     StockRequirement,
@@ -104,6 +111,22 @@ class StockRepository:
             ingredient_id,
         )
         return [row["sku"] for row in rows]
+
+    async def restock(self, sku: str, quantity: float) -> RestockResult:
+        pool = self._require_pool()
+        row = await pool.fetchrow(
+            "UPDATE ingredients SET stock_on_hand = stock_on_hand + $2 "
+            "WHERE sku = $1 RETURNING sku, name, unit, stock_on_hand, reorder_point",
+            sku,
+            quantity,
+        )
+        if row is None:
+            raise NotFoundError(f"Ingredient {sku} tidak ditemukan")
+        stock = float(row["stock_on_hand"])
+        rop = float(row["reorder_point"])
+        status = "out" if stock <= 0 else "low" if stock <= rop else "ok"
+        return RestockResult(row["sku"], row["name"], row["unit"], stock, status)
+
 
 
 class OrderRepository:
@@ -232,6 +255,147 @@ class OrderRepository:
                 allocated_at=datetime.now(UTC),
                 deductions=deductions,
             )
+
+
+
+ORDER_ITEMS_SQL = """
+SELECT oi.id, m.sku AS menu_sku, m.name AS menu_name,
+       oi.quantity::float8 AS quantity, oi.unit_price::float8 AS unit_price,
+       oi.line_total::float8 AS line_total, oi.status,
+       EXISTS(SELECT 1 FROM qc_logs q WHERE q.order_item_id = oi.id AND q.result = 'pass') AS qc_passed
+FROM order_items oi
+JOIN menus m ON m.id = oi.menu_id
+WHERE oi.order_id = $1
+ORDER BY oi.id
+"""
+
+
+class _OrderExtMixin:
+    async def save_from_parse(self, payload, items):
+        pool = self._require_pool()
+        async with pool.acquire() as conn, conn.transaction():
+            skus = [i.menu_sku for i in items]
+            menu_rows = await conn.fetch(
+                "SELECT id, sku, base_price::float8 AS base_price FROM menus WHERE sku = ANY($1::text[])",
+                skus,
+            )
+            menu_map = {r["sku"]: r for r in menu_rows}
+            missing = [sku for sku in skus if sku not in menu_map]
+            if missing:
+                raise ConflictError("Menu tidak valid: " + ", ".join(missing))
+            order_date = payload.order_date or datetime.now(UTC).date()
+            date_str = order_date.strftime("%Y%m%d")
+            seq = await conn.fetchval(
+                "SELECT COUNT(*) + 1 FROM b2b_orders WHERE order_code LIKE $1",
+                f"ORD-{date_str}-%",
+            )
+            order_code = f"ORD-{date_str}-{int(seq):03d}"
+            row = await conn.fetchrow(
+                "INSERT INTO b2b_orders (order_code, customer_name, channel, raw_text, status, order_date, notes) "
+                "VALUES ($1,$2,$3,$4,'parsed',$5,$6) "
+                "RETURNING id, order_code, status, version, order_date",
+                order_code, payload.customer_name, payload.channel, payload.raw_text, order_date, payload.notes,
+            )
+            total = 0.0
+            for item in items:
+                menu = menu_map[item.menu_sku]
+                qty = float(item.quantity)
+                price = float(menu["base_price"])
+                total += qty * price
+                await conn.execute(
+                    "INSERT INTO order_items (order_id, menu_id, quantity, unit_price, status) VALUES ($1,$2,$3,$4,'pending')",
+                    row["id"], menu["id"], qty, price,
+                )
+            return SavedOrder(row["id"], row["order_code"], row["status"], int(row["version"]), row["order_date"], len(items), total, True)
+
+    async def list_orders(self, status=None, date_value=None, limit=20):
+        pool = self._require_pool()
+        clauses = []
+        params = []
+        if status:
+            params.append(status)
+            clauses.append(f"status = ${len(params)}")
+        if date_value:
+            params.append(date_value)
+            clauses.append(f"order_date = ${len(params)}")
+        params.append(limit)
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        rows = await pool.fetch(
+            "SELECT o.id, o.order_code, o.customer_name, o.channel, o.status, o.order_date, o.version, "
+            "COUNT(oi.id)::int AS item_count, COALESCE(SUM(oi.line_total),0)::float8 AS total_amount "
+            f"FROM b2b_orders o LEFT JOIN order_items oi ON oi.order_id=o.id {where} "
+            "GROUP BY o.id ORDER BY o.id DESC LIMIT $" + str(len(params)),
+            *params,
+        )
+        return [OrderSummaryRow(r["id"], r["order_code"], r["customer_name"], r["channel"], r["status"], r["order_date"], int(r["version"]), int(r["item_count"]), float(r["total_amount"])) for r in rows]
+
+    async def get_detail(self, order_id):
+        pool = self._require_pool()
+        header = await pool.fetchrow(
+            "SELECT id, order_code, customer_name, channel, status, version, order_date, notes FROM b2b_orders WHERE id=$1",
+            order_id,
+        )
+        if header is None:
+            return None
+        rows = await pool.fetch(ORDER_ITEMS_SQL, order_id)
+        items = [OrderItemRow(r["id"], r["menu_sku"], r["menu_name"], float(r["quantity"]), float(r["unit_price"]), float(r["line_total"]), r["status"], bool(r["qc_passed"])) for r in rows]
+        requirements = await self._fetch_requirements(pool, order_id)
+        return OrderDetail(header["id"], header["order_code"], header["customer_name"], header["channel"], header["status"], int(header["version"]), header["order_date"], header["notes"], items, requirements)
+
+    async def confirm_or_short(self, order_id):
+        pool = self._require_pool()
+        async with pool.acquire() as conn, conn.transaction():
+            header = await conn.fetchrow(
+                "SELECT id, order_code, status, version FROM b2b_orders WHERE id=$1 FOR UPDATE",
+                order_id,
+            )
+            if header is None:
+                raise NotFoundError(f"Order {order_id} tidak ditemukan")
+            if header["status"] in ("fulfilled", "cancelled"):
+                raise ConflictError(f"Order berstatus {header['status']} tidak dapat diubah")
+            requirements = await self._fetch_requirements(conn, order_id)
+            if not requirements:
+                raise ConflictError("Order tidak memiliki item")
+            sufficient = all(item.shortage <= 0 for item in requirements)
+            new_status = "confirmed" if sufficient else "short"
+            if header["status"] != new_status:
+                await conn.execute(
+                    "UPDATE b2b_orders SET status=$2, version=version+1, updated_at=now() WHERE id=$1",
+                    order_id, new_status,
+                )
+            row = await conn.fetchrow("SELECT status, version FROM b2b_orders WHERE id=$1", order_id)
+            return ConfirmResult(header["id"], header["order_code"], row["status"], int(row["version"]), requirements)
+
+    async def record_qc_pass(self, order_id, item_id, checked_by, note):
+        pool = self._require_pool()
+        async with pool.acquire() as conn, conn.transaction():
+            row = await conn.fetchrow(
+                "SELECT oi.id FROM order_items oi WHERE oi.id=$1 AND oi.order_id=$2 FOR UPDATE",
+                item_id, order_id,
+            )
+            if row is None:
+                raise NotFoundError(f"Item {item_id} pada order {order_id} tidak ditemukan")
+            ing_rows = await conn.fetch(
+                "SELECT mr.ingredient_id FROM menu_recipes mr JOIN order_items oi ON oi.menu_id=mr.menu_id WHERE oi.id=$1",
+                item_id,
+            )
+            recorded = 0
+            for ing in ing_rows:
+                await conn.execute(
+                    "INSERT INTO qc_logs (order_item_id, ingredient_id, result, checked_by, note) VALUES ($1,$2,'pass',$3,$4)",
+                    item_id, ing["ingredient_id"], checked_by, note,
+                )
+                recorded += 1
+            exists = await conn.fetchval(
+                "SELECT EXISTS(SELECT 1 FROM qc_logs WHERE order_item_id=$1 AND result='pass')",
+                item_id,
+            )
+            return QcRecordResult(order_id, item_id, "pass", bool(exists), recorded)
+
+
+# bind mixin methods onto OrderRepository
+for _name in ("save_from_parse", "list_orders", "get_detail", "confirm_or_short", "record_qc_pass"):
+    setattr(OrderRepository, _name, getattr(_OrderExtMixin, _name))
 
 
 class DashboardRepository:

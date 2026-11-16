@@ -125,3 +125,68 @@ def test_allocate_rejects_insufficient_stock(client, order_repo):
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INSUFFICIENT_STOCK"
     assert order_repo.allocate_calls == []
+
+
+from datetime import date
+from app.domain import ConfirmResult, OrderDetail, OrderItemRow, OrderSummaryRow, QcRecordResult, SavedOrder, StockRequirement
+
+
+def test_save_order_creates_parsed_order(client, order_repo):
+    from app.domain import SavedOrder
+    order_repo.saved = SavedOrder(10, "ORD-20261117-001", "parsed", 1, date(2026, 11, 17), 2, 36000.0, True)
+    resp = client.post("/v1/orders", json={
+        "raw_text": "40 nasi bogana",
+        "channel": "whatsapp",
+        "customer_name": "Warung Bu Sri",
+        "order_date": "2026-11-17",
+        "items": [{"menu_sku": "MNU-NBG-01", "quantity": 2}],
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["order_id"] == 10
+    assert body["status"] == "parsed"
+    assert body["item_count"] == 2
+
+
+def test_list_orders(client, order_repo):
+    order_repo.orders = [
+        OrderSummaryRow(2, "ORD-20261115-002", "Katering Dapur Ibu Hana", "email", "short", date(2026,11,15), 1, 2, 630000.0),
+    ]
+    resp = client.get("/v1/orders")
+    assert resp.status_code == 200
+    assert resp.json()["items"][0]["order_code"] == "ORD-20261115-002"
+
+
+def test_get_order_detail(client, order_repo):
+    order_repo.detail = OrderDetail(
+        id=2, order_code="ORD-20261115-002", customer_name="Katering Dapur Ibu Hana",
+        channel="email", status="short", version=1, order_date=date(2026,11,15), notes=None,
+        items=[OrderItemDetailRow(3, "MNU-TLB-01", "Nasi Telur Balado", 30.0, 13000.0, 390000.0, "pending", False)] if False else [OrderItemRow(3, "MNU-TLB-01", "Nasi Telur Balado", 30.0, 13000.0, 390000.0, "pending", False)],
+        requirements=[StockRequirement(1,"ING-RS-01","Beras Pandan Wangi","kg",5.0,2.0)],
+    )
+    resp = client.get("/v1/orders/2")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == 2
+    assert body["sufficient"] is False
+    assert body["insufficient"][0]["ingredient_sku"] == "ING-RS-01"
+    assert body["items"][0]["qc_passed"] is False
+
+
+def test_confirm_updates_status(client, order_repo):
+    order_repo.confirm_result = ConfirmResult(2, "ORD-20261115-002", "confirmed", 2, [StockRequirement(1,"ING-RS-01","Beras Pandan Wangi","kg",5.0,100.0)])
+    resp = client.post("/v1/orders/2/confirm")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "confirmed"
+    assert body["sufficient"] is True
+    assert order_repo.confirm_calls == [2]
+
+
+def test_record_qc_pass(client, order_repo):
+    order_repo.qc_result = QcRecordResult(2, 3, "pass", True, 6)
+    resp = client.post("/v1/orders/2/items/3/qc", json={"checked_by":"admin"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["qc_passed"] is True
+    assert body["recorded"] == 6

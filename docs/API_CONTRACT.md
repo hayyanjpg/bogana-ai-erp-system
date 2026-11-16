@@ -361,6 +361,62 @@ Memotong `ingredients.stock_on_hand` dan mengubah status order
 
 ---
 
+### 7.4 Alur E2E (parse → simpan → konfirmasi → QC → alokasi)
+
+1. `POST /v1/parse-order` — ekstraksi teks (tidak menyimpan).
+2. `POST /v1/orders` — simpan order hasil parse (status awal `parsed`), mengembalikan `order_id`.
+3. `GET /v1/orders` / `GET /v1/orders/{order_id}` — daftar/detail order + kebutuhan bahan + status QC per item.
+4. `POST /v1/orders/{order_id}/confirm` — hitung kebutuhan bahan dan persist status `confirmed` (cukup) atau `short` (kurang).
+5. `POST /v1/stocks/{sku}/restock` — tambah stok bahan (jika short), lalu ulangi `confirm`.
+6. `POST /v1/orders/{order_id}/items/{item_id}/qc` — catat QC `pass` untuk item (log per bahan resep item).
+7. `POST /v1/orders/{order_id}/allocate` — potong stok atomik & set `fulfilled` (syarat: `confirmed`, QC pass semua item, stok cukup).
+
+### 7.5 `POST /v1/orders` (simpan dari hasil parse)
+
+**Request**
+```json
+{
+  "raw_text": "40 nasi bogana",
+  "channel": "whatsapp",
+  "customer_name": "Warung Bu Sri",
+  "order_date": "2026-11-16",
+  "notes": "opsional",
+  "items": [{"menu_sku":"MNU-NBG-01","quantity":40}]
+}
+```
+- `items` berisi item hasil parse yang valid (`menu_sku` ada di katalog, `quantity > 0`).
+
+**Response 200**: `{ "order_id", "order_code", "status": "parsed", "version", "order_date", "item_count", "total_amount", "created" }`.
+
+### 7.6 `GET /v1/orders` dan `GET /v1/orders/{order_id}`
+
+- `GET /v1/orders?date=&status=&limit=` → `{ "items": [{id,order_code,customer_name,channel,status,order_date,version,item_count,total_amount}] }`
+- `GET /v1/orders/{id}` → detail order + `items[]` (termasuk `qc_passed`) + `requirements[]`/`insufficient[]`/`sufficient`.
+
+### 7.7 `POST /v1/orders/{order_id}/confirm`
+
+Menghitung kebutuhan bahan dan mempersist status:
+- cukup → `confirmed` (version bertambah bila berubah)
+- kurang → `short`
+
+**Response 200**: `{ "order_id","order_code","status","version","sufficient","insufficient":[...] }`. 409 bila `fulfilled`/`cancelled`.
+
+### 7.8 `POST /v1/orders/{order_id}/items/{item_id}/qc`
+
+Mencatat QC `pass` untuk seluruh bahan resep item.
+
+**Request**: `{ "checked_by": "admin", "note": "opsional", "result": "pass" }`
+**Response 200**: `{ "order_id","order_item_id","result":"pass","qc_passed":true,"recorded": <jumlah log> }`.
+
+### 7.9 `POST /v1/stocks/{sku}/restock`
+
+Menambah `stock_on_hand` (atomik). Menginvalidasi `erp:stock:all`.
+
+**Request**: `{ "quantity": <number > 0> }`
+**Response 200**: `{ "sku","name","unit","stock_on_hand","status" }`. 404 bila SKU tidak ada.
+
+---
+
 ## 8. `GET /v1/dashboard/summary`
 
 Agregat untuk dashboard PHP. Dilayani dari Redis `erp:dashboard:summary` (TTL 30 s).
@@ -459,8 +515,14 @@ Prakiraan permintaan per menu dari `demand_forecasts`.
 | POST | `/v1/parse-order` | Teks -> item menu | Redis 15 m |
 | GET | `/v1/stocks` | Daftar stok | Redis 60 s |
 | GET | `/v1/stocks/{sku}` | Detail stok | Redis 60 s |
+| POST | `/v1/orders` | Simpan order dari hasil parse | invalidasi dashboard |
+| GET | `/v1/orders` | Daftar order | - |
+| GET | `/v1/orders/{order_id}` | Detail order + kebutuhan/QC | - |
 | POST | `/v1/orders/{order_id}/check-stock` | Cek kecukupan bahan | - |
-| POST | `/v1/orders/{order_id}/allocate` | Alokasi stok (transaksi) | invalidasi cache |
+| POST | `/v1/orders/{order_id}/confirm` | Hitung & persist status confirmed/short | invalidasi dashboard |
+| POST | `/v1/orders/{order_id}/items/{item_id}/qc` | Catat QC pass item | - |
+| POST | `/v1/orders/{order_id}/allocate` | Alokasi stok (transaksi) | invalidasi stok & dashboard |
+| POST | `/v1/stocks/{sku}/restock` | Tambah stok bahan | invalidasi stok |
 | GET | `/v1/dashboard/summary` | Agregat dashboard | Redis 30 s |
 | GET | `/v1/forecasts` | Forecast per menu | - |
 

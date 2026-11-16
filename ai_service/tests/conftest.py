@@ -148,13 +148,31 @@ class FakeMenuRepository:
 
 class FakeStockRepository:
     def __init__(self, ingredients: tuple[Ingredient, ...]) -> None:
-        self._ingredients = ingredients
+        self._ingredients = list(ingredients)
+        self.restock_calls: list[tuple[str, float]] = []
 
     async def list_all(self) -> tuple[Ingredient, ...]:
-        return self._ingredients
+        return tuple(self._ingredients)
 
     async def list_menu_skus(self, ingredient_id: int) -> list[str]:
         return MENU_SKUS_BY_INGREDIENT.get(ingredient_id, [])
+
+    async def restock(self, sku: str, quantity: float):
+        from app.domain import RestockResult
+        self.restock_calls.append((sku, quantity))
+        for i, ing in enumerate(self._ingredients):
+            if ing.sku == sku:
+                stock = ing.stock_on_hand + quantity
+                rop = ing.reorder_point
+                status = "out" if stock <= 0 else "low" if stock <= rop else "ok"
+                self._ingredients[i] = Ingredient(
+                    id=ing.id, sku=ing.sku, name=ing.name, unit=ing.unit,
+                    stock_on_hand=stock, reorder_point=ing.reorder_point,
+                    unit_cost=ing.unit_cost, category=ing.category,
+                )
+                return RestockResult(sku=ing.sku, name=ing.name, unit=ing.unit, stock_on_hand=stock, status=status)
+        from app.errors import NotFoundError
+        raise NotFoundError(f"Ingredient {sku} tidak ditemukan")
 
 
 class FakeOrderRepository:
@@ -162,6 +180,13 @@ class FakeOrderRepository:
         self.snapshot: OrderSnapshot | None = None
         self.allocation: AllocationResult | None = None
         self.allocate_calls: list[tuple[int, int | None]] = []
+        self.saved = None
+        self.detail = None
+        self.orders = []
+        self.confirm_result = None
+        self.confirm_calls: list[int] = []
+        self.qc_result = None
+        self.qc_calls = []
 
     async def get_snapshot(self, order_id: int) -> OrderSnapshot | None:
         return self.snapshot
@@ -175,6 +200,32 @@ class FakeOrderRepository:
         if self.allocation is None:
             raise AssertionError("allocation belum disiapkan pada fake repository")
         return self.allocation
+
+    async def save_from_parse(self, payload, items):
+        from app.domain import SavedOrder
+        from datetime import date
+        if self.saved is not None:
+            return self.saved
+        d = payload.order_date or date.today()
+        return SavedOrder(99, "ORD-TEST-001", "parsed", 1, d, len(items), 0.0, True)
+
+    async def list_orders(self, status=None, date_value=None, limit=20):
+        return self.orders
+
+    async def get_detail(self, order_id: int):
+        return self.detail
+
+    async def confirm_or_short(self, order_id: int):
+        self.confirm_calls.append(order_id)
+        if self.confirm_result is None:
+            raise AssertionError("confirm_result belum disiapkan pada fake repository")
+        return self.confirm_result
+
+    async def record_qc_pass(self, order_id: int, item_id: int, checked_by: str, note):
+        self.qc_calls.append((order_id, item_id, checked_by, note))
+        if self.qc_result is None:
+            raise AssertionError("qc_result belum disiapkan pada fake repository")
+        return self.qc_result
 
 
 class FakeDashboardRepository:

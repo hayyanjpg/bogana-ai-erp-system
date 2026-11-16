@@ -5,9 +5,13 @@
 /** @var string $sku */
 /** @var array<string, mixed>|null $detail */
 /** @var array<string, mixed>|null $detailError */
+/** @var array<string, mixed>|null $restockResult */
+/** @var array<string, mixed>|null $restockError */
 $items = is_array($data['items'] ?? null) ? $data['items'] : [];
 $detail = is_array($detail ?? null) ? $detail : null;
 $detailError = is_array($detailError ?? null) ? $detailError : null;
+$restockResult = is_array($restockResult ?? null) ? $restockResult : null;
+$restockError = is_array($restockError ?? null) ? $restockError : null;
 $lowOnly = (bool)($lowOnly ?? false);
 $category = (string)($category ?? '');
 $sku = (string)($sku ?? '');
@@ -38,6 +42,8 @@ $baseQuery = ['page'=>'stocks']; if($category!=='') $baseQuery['category']=$cate
     <div class="bg-surface-container-lowest p-5 rounded-xl shadow-xs border border-outline-variant/20"><div class="flex items-center justify-between"><span class="text-[11px] text-on-surface-variant uppercase tracking-wide font-medium">Nilai Persediaan</span><span class="material-symbols-outlined text-primary text-[20px]">payments</span></div><div class="mt-2 font-headline text-[24px] font-semibold tabular">Rp <?= e(format_number($inventoryValue)) ?></div><div class="mt-1 text-[11px] text-on-surface-variant">Stok × harga satuan (filter)</div></div>
   </section>
 
+  <?php if ($restockResult !== null): ?><div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-900"><p class="text-[13px] font-semibold">Restock berhasil: <?= e($restockResult['sku'] ?? '-') ?> (<?= e($restockResult['name'] ?? '-') ?>)</p><p class="text-[12px] mt-0.5">Stok sekarang <?= e(format_quantity((float)($restockResult['stock_on_hand'] ?? 0))) ?> <?= e($restockResult['unit'] ?? '') ?> · status <?= e(status_label((string)($restockResult['status'] ?? ''))) ?></p></div><?php endif; ?>
+  <?php if ($restockError !== null): ?><div class="rounded-lg border border-error/30 bg-error-container/40 p-3"><p class="text-[13px] font-semibold text-on-error-container">Restock gagal</p><p class="text-[12px] text-on-error-container/90 mt-0.5"><?= e($restockError['message'] ?? 'Permintaan gagal') ?></p><p class="text-[11px] font-mono mt-1"><?= e($restockError['code'] ?? 'ERROR') ?></p></div><?php endif; ?>
   <?php if ($detailError !== null): ?><div class="rounded-lg border border-error/30 bg-error-container/40 p-3"><p class="text-[13px] font-semibold text-on-error-container">Detail bahan gagal dimuat</p><p class="text-[12px] text-on-error-container/90 mt-0.5"><?= e($detailError['message'] ?? 'Bahan tidak ditemukan.') ?></p><p class="text-[11px] font-mono mt-1"><?= e($detailError['code'] ?? 'ERROR') ?></p></div><?php endif; ?>
 
   <?php if ($detail !== null): ?>
@@ -58,6 +64,20 @@ $baseQuery = ['page'=>'stocks']; if($category!=='') $baseQuery['category']=$cate
           <div class="p-3 rounded-lg bg-surface-container-low"><div class="text-[11px] text-on-surface-variant">Satuan</div><div class="text-[14px] font-semibold mt-0.5"><?= e($detail['unit'] ?? '-') ?></div></div>
           <div class="p-3 rounded-lg bg-surface-container-low"><div class="text-[11px] text-on-surface-variant">Dipakai di</div><div class="text-[14px] font-semibold tabular mt-0.5"><?= e(count($used)) ?> menu</div></div>
         </div>
+      </div>
+      <div class="mt-4 pt-4 border-t border-outline-variant/20">
+        <h3 class="text-[13px] font-semibold mb-2">Restock / Tambah Stok</h3>
+        <form method="post" action="?page=stocks&sku=<?= e($detail['sku'] ?? '') ?>" data-submit-lock class="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+          <input type="hidden" name="action" value="restock">
+          <input type="hidden" name="sku" value="<?= e($detail['sku'] ?? '') ?>">
+          <input type="hidden" name="detail_sku" value="<?= e($detail['sku'] ?? '') ?>">
+          <input type="hidden" name="category" value="<?= e($category) ?>">
+          <input type="hidden" name="low_only" value="<?= $lowOnly ? '1' : '0' ?>">
+          <label class="flex flex-col gap-1"><span class="text-[12px] font-medium">Jumlah tambah (<?= e($detail['unit'] ?? '') ?>)</span><input class="h-9 px-3 rounded-lg bg-surface-container-low/60 border border-outline-variant/40 text-[13px] w-40" type="number" name="quantity" min="0.001" step="0.001" required placeholder="contoh: 50"></label>
+          <button class="h-9 px-4 rounded-lg bg-primary text-on-primary text-[13px] font-medium" type="submit">Tambah Stok</button>
+          <span class="text-[11px] text-on-surface-variant pb-2">Setelah restock, buka Order terkait dan klik Cek & Konfirmasi untuk update status (short→confirmed bila cukup).</span>
+        </form>
       </div>
     </section>
   <?php endif; ?>

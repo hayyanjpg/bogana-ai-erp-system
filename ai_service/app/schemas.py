@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
@@ -109,6 +111,114 @@ class AllocateOrderResponse(BaseModel):
     allocated_at: datetime
     deductions: list[AllocationDeductionItem]
     invalidated_cache_keys: list[str]
+
+
+class SaveOrderItem(BaseModel):
+    menu_sku: str = Field(min_length=1, max_length=64)
+    quantity: float = Field(gt=0)
+
+
+class SaveOrderRequest(BaseModel):
+    raw_text: str = Field(min_length=3, max_length=500)
+    channel: Channel
+    customer_name: str = Field(min_length=2, max_length=120)
+    order_date: date | None = None
+    notes: str | None = Field(default=None, max_length=500)
+    items: list[SaveOrderItem] = Field(min_length=1)
+
+
+class SaveOrderResponse(BaseModel):
+    order_id: int
+    order_code: str
+    status: str
+    version: int
+    order_date: date
+    item_count: int
+    total_amount: float
+    created: bool
+
+
+class OrderSummary(BaseModel):
+    id: int
+    order_code: str
+    customer_name: str
+    channel: str
+    status: str
+    order_date: date
+    version: int
+    item_count: int
+    total_amount: float
+
+
+class OrderListResponse(BaseModel):
+    items: list[OrderSummary]
+
+
+class OrderItemDetail(BaseModel):
+    id: int
+    menu_sku: str
+    menu_name: str
+    quantity: float
+    unit_price: float
+    line_total: float
+    status: str
+    qc_passed: bool
+
+
+class OrderDetailResponse(BaseModel):
+    id: int
+    order_code: str
+    customer_name: str
+    channel: str
+    status: str
+    version: int
+    order_date: date
+    notes: str | None
+    items: list[OrderItemDetail]
+    sufficient: bool
+    requirements: list[StockRequirementItem]
+    insufficient: list[StockRequirementItem]
+
+
+class ConfirmOrderResponse(BaseModel):
+    order_id: int
+    order_code: str
+    status: str
+    version: int
+    sufficient: bool
+    insufficient: list[StockRequirementItem]
+
+
+class RecordQcRequest(BaseModel):
+    checked_by: str = Field(min_length=2, max_length=120)
+    note: str | None = Field(default=None, max_length=500)
+    result: Literal["pass"] = "pass"
+
+
+class RecordQcResponse(BaseModel):
+    order_id: int
+    order_item_id: int
+    result: str
+    qc_passed: bool
+    recorded: int
+
+
+class RestockRequest(BaseModel):
+    quantity: float = Field(gt=0)
+
+
+class RestockResponse(BaseModel):
+    sku: str
+    name: str
+    unit: str
+    stock_on_hand: float
+    status: Literal["ok", "low", "out"]
+
+
+class ListOrdersQuery(BaseModel):
+    status: str | None = None
+    order_date: date | None = None
+    limit: int = Field(default=20, ge=1, le=100)
 
 
 class DashboardOrders(BaseModel):

@@ -68,35 +68,27 @@ Masalah yang diselesaikan sistem:
 
 ## 4. Detail langkah
 
-### 4.1 Order teks -> NLP parser
+### 4.1 Order teks -> NLP parser -> simpan order
 
-- Input: `raw_text` (string), `channel`, `order_date` (opsional, default besok).
-- Parser mengembalikan `items` dengan `menu_sku` yang **wajib** cocok dengan
-  `menus.sku` di `database/schema.sql`.
-- Aturan parsing:
-  - Kuantitas tanpa satuan = porsi.
-  - Kuantitas tidak ditemukan -> item ditolak dengan alasan `qty_missing`.
-  - Menu tidak dikenali -> `menu_not_found`, tidak boleh ditebak.
-  - Duplikasi menu pada satu order digabung (akumulasi kuantitas).
-- Parser **tidak** menyentuh stok. Pengecekan stok adalah langkah terpisah agar
-  bisa dipanggil ulang tanpa parsing ulang.
+- `POST /v1/parse-order`: input `raw_text` (string), `channel`, `customer_name`, `order_date` (opsional). Parser mengembalikan `items` dengan `menu_sku` yang **wajib** cocok dengan `menus.sku` di `database/schema.sql`.
+- Aturan parsing: kuantitas tanpa satuan = porsi; kuantitas tidak ditemukan/ambigu/menu tidak dikenali → warning (`QTY_MISSING`/`QTY_AMBIGUOUS`/`MENU_NOT_FOUND`), tidak boleh ditebak; duplikasi menu digabung.
+- Parser **tidak** menyentuh stok/DB order. Admin menyimpan hasil parse via `POST /v1/orders` (payload + `items` valid) → order tersimpan berstatus `parsed`.
 
-### 4.2 Cek stok PostgreSQL
+### 4.2 Cek stok, konfirmasi status, QC, dan restock
 
-- Stok dihitung dari `menu_recipes` (bill of materials) terhadap
-  `ingredients.stock_on_hand`.
-- Kebutuhan bahan per item: `sum(menu_recipes.quantity * order_items.quantity)`.
-- Hasil: `sufficient: bool`, `insufficient: [{ingredient_sku, required, available, shortage}]`.
-- Stok **tidak boleh** negatif. Pengurangan stok hanya lewat transaksi
-  `BEGIN ... COMMIT` saat order `confirmed -> fulfilled`.
+- `POST /v1/orders/{id}/check-stock`: kebutuhan dari `menu_recipes` vs `ingredients.stock_on_hand` → `sufficient`, `requirements[]`, `insufficient[]` (laporan, tanpa mutasi).
+- `POST /v1/orders/{id}/confirm`: hitung kebutuhan dan **persist** status `confirmed` (cukup) atau `short` (kurang). Order `fulfilled/cancelled` ditolak.
+- Jika `short`: tambah stok via `POST /v1/stocks/{sku}/restock` (stok tidak boleh negatif), lalu `confirm` ulang hingga `confirmed`.
+- QC: `POST /v1/orders/{id}/items/{item_id}/qc` mencatat `qc_logs` `pass` per bahan resep item. Seluruh item wajib punya QC pass sebelum alokasi.
+- `POST /v1/orders/{id}/allocate`: transaksi atomik, syarat `confirmed` + QC pass semua item + stok cukup → potong `ingredients.stock_on_hand`, set `fulfilled`. Stok **tidak boleh** negatif.
 
 ### 4.3 Cache Redis
 
 | Key | Isi | TTL | Invalidasi |
 | --- | --- | --- | --- |
-| `erp:stock:{ingredient_id}` | snapshot stok bahan | 60 s | saat stok berubah (QC/pemenuhan) |
-| `erp:stock:all` | daftar stok ringkas | 60 s | idem |
-| `erp:dashboard:summary` | agregat dashboard | 30 s | setiap order berubah status |
+| `erp:stock:{ingredient_id}` | snapshot stok bahan | 60 s | saat stok berubah (restock/pemenuhan) |
+| `erp:stock:all` | daftar stok ringkas | 60 s | saat stok berubah (restock/pemenuhan) |
+| `erp:dashboard:summary` | agregat dashboard | 30 s | setiap order berubah status / tersimpan / dikonfirmasi |
 | `erp:parse:{sha1(raw_text)}` | hasil parse (idempotensi) | 15 menit | jangan dihapus sebelum TTL |
 
 - Cache bersifat **best-effort**: jika Redis mati, sistem tetap jalan dengan

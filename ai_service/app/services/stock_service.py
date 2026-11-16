@@ -88,3 +88,16 @@ class StockService:
         if category is not None and ingredient.category != category:
             return False
         return not (low_only and stock_status(ingredient) == "ok")
+
+
+    async def restock(self, sku: str, quantity: float):
+        from app.schemas import RestockResponse
+        result = await self._repository.restock(sku, quantity)
+        await self._cache.delete(CACHE_KEY)
+        return RestockResponse(
+            sku=result.sku,
+            name=result.name,
+            unit=result.unit,
+            stock_on_hand=result.stock_on_hand,
+            status=result.status,
+        )

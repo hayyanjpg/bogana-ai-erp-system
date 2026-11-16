@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 
 from app.deps import get_stock_service, require_internal_token
-from app.schemas import StockDetailResponse, StockListResponse
+from app.schemas import RestockRequest, RestockResponse, StockDetailResponse, StockListResponse
 from app.services.stock_service import StockService
 
 router = APIRouter(
@@ -26,3 +26,12 @@ async def get_stock(
     service: StockService = Depends(get_stock_service),
 ) -> StockDetailResponse:
     return await service.get_stock(sku)
+
+
+@router.post("/stocks/{sku}/restock", response_model=RestockResponse)
+async def restock(
+    sku: str,
+    payload: RestockRequest,
+    service: StockService = Depends(get_stock_service),
+) -> RestockResponse:
+    return await service.restock(sku, payload.quantity)

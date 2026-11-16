@@ -63,8 +63,12 @@ final class Router
 
         match (true) {
             $page === 'orders' && $action === 'parse' => $this->parseOrder(),
+            $page === 'orders' && $action === 'save' => $this->saveOrder(),
             $page === 'orders' && $action === 'check' => $this->checkStock(),
+            $page === 'orders' && $action === 'confirm' => $this->confirmOrder(),
+            $page === 'orders' && $action === 'qc' => $this->recordQc(),
             $page === 'orders' && $action === 'allocate' => $this->allocateOrder(),
+            $page === 'stocks' && $action === 'restock' => $this->restockIngredient(),
             default => $this->renderError(404, 'Aksi tidak ditemukan', 'NOT_FOUND'),
         };
     }
@@ -82,9 +86,23 @@ final class Router
 
     private function orders(): void
     {
+        $orderId = $this->intValue($_GET['order_id'] ?? null);
+        $ordersList = null;
+        $orderDetail = null;
+        try {
+            $ordersList = $this->api->get('/v1/orders', ['limit' => 20]);
+            if ($orderId !== null) {
+                $orderDetail = $this->api->get('/v1/orders/' . $orderId);
+            }
+        } catch (ApiException | RuntimeException) {
+            // best-effort; actions will show specific errors
+        }
+
         $this->renderOrders([
-            'orderId' => $this->intValue($_GET['order_id'] ?? null),
+            'orderId' => $orderId,
             'focus' => $this->focusValue($_GET['focus'] ?? null),
+            'ordersList' => $ordersList,
+            'orderDetail' => $orderDetail,
             'form' => [
                 'order_date' => date('Y-m-d'),
             ],
@@ -272,6 +290,8 @@ final class Router
             'sku' => $sku,
             'detail' => $detail,
             'detailError' => $detailError,
+            'restockResult' => null,
+            'restockError' => null,
         ]);
     }
 
@@ -326,10 +346,18 @@ final class Router
             'title' => 'Order & Parser',
             'parseResult' => null,
             'parseError' => null,
+            'saveResult' => null,
+            'saveError' => null,
             'checkResult' => null,
             'checkError' => null,
+            'confirmResult' => null,
+            'confirmError' => null,
+            'qcResult' => null,
+            'qcError' => null,
             'allocateResult' => null,
             'allocateError' => null,
+            'ordersList' => null,
+            'orderDetail' => null,
             'orderId' => null,
             'focus' => null,
             'form' => [
@@ -343,6 +371,22 @@ final class Router
 
         $form = is_array($data['form'] ?? null) ? $data['form'] : [];
         $defaults['form'] = array_merge($defaults['form'], $form);
+
+        if (!array_key_exists('ordersList', $data) || !array_key_exists('orderDetail', $data)) {
+            $oid = $data['orderId'] ?? $defaults['orderId'];
+            if ($oid === null) {
+                $oid = $this->intValue($_POST['order_id'] ?? null);
+            }
+            try {
+                if (!array_key_exists('ordersList', $data)) {
+                    $defaults['ordersList'] = $this->api->get('/v1/orders', ['limit' => 20]);
+                }
+                if (!array_key_exists('orderDetail', $data) && $oid !== null) {
+                    $defaults['orderDetail'] = $this->api->get('/v1/orders/' . (int) $oid);
+                }
+            } catch (ApiException | RuntimeException) {
+            }
+        }
 
         echo $this->view->render('orders', array_merge($defaults, $data));
     }
@@ -364,6 +408,95 @@ final class Router
             'order_date' => $this->dateValue($_POST['order_date'] ?? null) ?? '',
             'notes' => trim((string) ($_POST['notes'] ?? '')),
         ];
+    }
+
+    private function saveOrder(): void
+    {
+        $form = $this->formFromPost();
+        $itemsJson = trim((string) ($_POST['items_json'] ?? '[]'));
+        $items = json_decode($itemsJson, true);
+        if (!is_array($items) || $items === []) {
+            $this->renderOrders(['form' => $form, 'saveError' => ['status'=>0,'code'=>'FORM_INVALID','message'=>'Tidak ada item parse untuk disimpan. Urai pesanan terlebih dahulu.','details'=>[]], 'focus'=>'save']);
+            return;
+        }
+        $payload = [
+            'raw_text' => $form['raw_text'],
+            'channel' => $form['channel'],
+            'customer_name' => $form['customer_name'],
+            'items' => array_values($items),
+        ];
+        if ($form['order_date'] !== '') { $payload['order_date'] = $form['order_date']; }
+        if ($form['notes'] !== '') { $payload['notes'] = $form['notes']; }
+        try {
+            $result = $this->api->post('/v1/orders', $payload);
+            $oid = (int) ($result['order_id'] ?? 0);
+            $detail = $oid > 0 ? $this->api->get('/v1/orders/' . $oid) : null;
+            $this->renderOrders(['form' => $form, 'saveResult' => $result, 'orderId' => $oid ?: null, 'orderDetail' => $detail, 'focus' => 'check']);
+        } catch (ApiException | RuntimeException $exception) {
+            $this->renderOrders(['form' => $form, 'saveError' => $this->toError($exception), 'focus' => 'save']);
+        }
+    }
+
+    private function confirmOrder(): void
+    {
+        $orderId = $this->intValue($_POST['order_id'] ?? null);
+        if ($orderId === null) {
+            $this->renderOrders(['confirmError' => ['status'=>0,'code'=>'FORM_INVALID','message'=>'Order ID harus berupa angka bulat positif.','details'=>[]], 'focus'=>'confirm']);
+            return;
+        }
+        try {
+            $result = $this->api->post("/v1/orders/{$orderId}/confirm");
+            $detail = $this->api->get("/v1/orders/{$orderId}");
+            $this->renderOrders(['orderId'=>$orderId,'confirmResult'=>$result,'orderDetail'=>$detail,'focus'=>'confirm']);
+        } catch (ApiException | RuntimeException $exception) {
+            $this->renderOrders(['orderId'=>$orderId,'confirmError'=>$this->toError($exception),'focus'=>'confirm']);
+        }
+    }
+
+    private function recordQc(): void
+    {
+        $orderId = $this->intValue($_POST['order_id'] ?? null);
+        $itemId = $this->intValue($_POST['item_id'] ?? null);
+        $checkedBy = trim((string) ($_POST['checked_by'] ?? 'admin'));
+        if ($orderId === null || $itemId === null) {
+            $this->renderOrders(['orderId'=>$orderId,'qcError'=>['status'=>0,'code'=>'FORM_INVALID','message'=>'Order ID dan Item ID wajib diisi.','details'=>[]],'focus'=>'qc']);
+            return;
+        }
+        try {
+            $result = $this->api->post("/v1/orders/{$orderId}/items/{$itemId}/qc", ['checked_by' => $checkedBy !== '' ? $checkedBy : 'admin', 'result' => 'pass']);
+            $detail = $this->api->get("/v1/orders/{$orderId}");
+            $this->renderOrders(['orderId'=>$orderId,'qcResult'=>$result,'orderDetail'=>$detail,'focus'=>'qc']);
+        } catch (ApiException | RuntimeException $exception) {
+            $this->renderOrders(['orderId'=>$orderId,'qcError'=>$this->toError($exception),'focus'=>'qc']);
+        }
+    }
+
+    private function restockIngredient(): void
+    {
+        $sku = trim((string) ($_POST['sku'] ?? ''));
+        $qty = (float) ($_POST['quantity'] ?? 0);
+        $category = trim((string) ($_POST['category'] ?? ''));
+        $lowOnly = (string) ($_POST['low_only'] ?? '0') === '1';
+        $detailSku = trim((string) ($_POST['detail_sku'] ?? $sku));
+        $base = ['title'=>'Stok Bahan','lowOnly'=>$lowOnly,'category'=>$category,'sku'=>$detailSku];
+        if ($sku === '' || $qty <= 0) {
+            try { $base['data'] = $this->api->get('/v1/stocks', array_filter(['category'=>$category?:null,'low_only'=>$lowOnly?'true':null])); } catch (ApiException | RuntimeException $e) { $base['data']=['items'=>[],'source'=>'-','generated_at'=>'']; }
+            $base['restockError'] = ['status'=>0,'code'=>'FORM_INVALID','message'=>'SKU dan jumlah restock (> 0) wajib diisi.','details'=>[]];
+            echo $this->view->render('stocks', array_merge(['detail'=>null,'detailError'=>null,'restockResult'=>null], $base));
+            return;
+        }
+        try {
+            $restockResult = $this->api->post('/v1/stocks/' . rawurlencode($sku) . '/restock', ['quantity' => $qty]);
+            $data = $this->api->get('/v1/stocks', array_filter(['category'=>$category?:null,'low_only'=>$lowOnly?'true':null]));
+            $detail = null; $detailError = null;
+            if ($detailSku !== '') {
+                try { $detail = $this->api->get('/v1/stocks/' . rawurlencode($detailSku)); } catch (ApiException | RuntimeException $e) { $detailError = $this->toError($e); }
+            }
+            echo $this->view->render('stocks', ['title'=>'Stok Bahan','data'=>$data,'lowOnly'=>$lowOnly,'category'=>$category,'sku'=>$detailSku,'detail'=>$detail,'detailError'=>$detailError,'restockResult'=>$restockResult,'restockError'=>null]);
+        } catch (ApiException | RuntimeException $exception) {
+            try { $base['data'] = $this->api->get('/v1/stocks', array_filter(['category'=>$category?:null,'low_only'=>$lowOnly?'true':null])); } catch (ApiException | RuntimeException $e) { $base['data']=['items'=>[],'source'=>'-','generated_at'=>'']; }
+            echo $this->view->render('stocks', array_merge(['detail'=>null,'detailError'=>null,'restockResult'=>null,'restockError'=>$this->toError($exception)], $base));
+        }
     }
 
     /**
@@ -423,7 +556,7 @@ final class Router
 
     private function focusValue(mixed $value): ?string
     {
-        return is_string($value) && in_array($value, ['check', 'allocate'], true) ? $value : null;
+        return is_string($value) && in_array($value, ['check', 'allocate', 'confirm', 'qc', 'save'], true) ? $value : null;
     }
 
     /**

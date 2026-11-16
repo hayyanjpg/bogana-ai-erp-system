@@ -52,3 +52,17 @@ def test_get_unknown_stock_returns_404(client):
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_restock_increases_stock(client):
+    resp = client.post("/v1/stocks/ING-KL-02/restock", json={"quantity": 5.0})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["sku"] == "ING-KL-02"
+    assert body["stock_on_hand"] == 5.0
+    assert body["status"] == "ok"
+
+
+def test_restock_unknown_returns_404(client):
+    resp = client.post("/v1/stocks/ING-NONE/restock", json={"quantity": 1})
+    assert resp.status_code == 404
