@@ -9,7 +9,7 @@
 #   db         PostgreSQL 16  (database/schema.sql sebagai sumber kebenaran)
 #   redis      Redis 7        (cache stok, dashboard, idempotensi parser)
 #   ai_service FastAPI        (NLP parser, cek stok, forecast)
-#   php        Dashboard ERP (PHP 8.2 + Apache)
+#   php        Dashboard ERP (PHP 8.4 + FrankenPHP)
 #
 # Jalankan:  docker compose up -d --build
 # Seed DB :  docker compose exec -T db psql -U postgres -d bogana -f - < database/schema.sql
