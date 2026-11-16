@@ -194,14 +194,14 @@ INSERT INTO ingredients (id, sku, name, category, unit, stock_on_hand, reorder_p
     (11, 'ING-GR-01', 'Gula Merah',             'bahan',   'kg',     35.000,   8.000, 17000.00, 'CV Sumber Pangan'),
     (12, 'ING-DJ-01', 'Daun Jeruk Purut',       'bumbu',   'kg',      5.000,   1.000, 40000.00, 'Pasar Induk Kramat');
 
--- 7.2 menus
+-- 7.2 menus (mengacu pada katalog asli Nasi Bogana Ny. An Lay)
 INSERT INTO menus (id, sku, name, category, base_price, description) VALUES
-    (1, 'MNU-NBG-01',  'Nasi Bogana Komplit',        'nasi',   18000.00, 'Nasi bogana + ayam kecap + telur + sambal'),
-    (2, 'MNU-NBG-02',  'Nasi Bogana Ayam Kecap',     'nasi',   15000.00, 'Nasi bogana + ayam kecap'),
-    (3, 'MNU-SOT-01',  'Soto Betawi Bogana',         'soto',   22000.00, 'Soto betawi sapi kuah santan'),
-    (4, 'MNU-RND-01',  'Rendang Sapi Bogana',        'nasi',   30000.00, 'Rendang sapi + nasi bogana'),
-    (5, 'MNU-KLP-01',  'Klepon Bogana Isi Gula Merah','snack', 12000.00, 'Klepon isi gula merah, per porsi 10 buah'),
-    (6, 'MNU-TLB-01',  'Nasi Telur Balado',          'nasi',   13000.00, 'Nasi bogana + telur balado');
+    (1, 'MNU-NBG-01',  'Nasi Bogana',        'nasi', 32000.00, 'Nasi gurih + sambal goreng kacang panjang, sambal goreng ampela, ayam opor suwir, dendeng age, telur pindang'),
+    (2, 'MNU-LNG-01',  'Nasi Langgi',        'nasi', 37000.00, 'Nasi putih + sambal goreng tempe, sambal goreng ampela, telur dadar, empal sapi, abon, serundeng'),
+    (3, 'MNU-RMS-01',  'Nasi Rames',         'nasi', 32000.00, 'Nasi gurih + ayam suwir balado, irisan telur dadar, mie goreng, orek tempe, dendeng sapi kering'),
+    (4, 'MNU-GDG-01',  'Nasi Gudeg',         'nasi', 32000.00, 'Nasi putih + gudeg, krecek, ayam opor, telur pindang, areh'),
+    (5, 'MNU-BOX-A',   'Nasi Box Paket A',   'box',  40000.00, 'Nasi, ayam goreng, telur balado, mie goreng, tumis buncis, kerupuk'),
+    (6, 'MNU-BOX-B',   'Nasi Box Paket B',   'box',  40000.00, 'Nasi, ayam kecap, perkedel, mie goreng, kentang buncis balado, kerupuk');
 
 -- 7.3 menu_recipes (BOM per 1 porsi)
 INSERT INTO menu_recipes (menu_id, ingredient_id, quantity) VALUES
