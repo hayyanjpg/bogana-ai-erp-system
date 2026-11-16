@@ -83,6 +83,7 @@ CREATE TABLE b2b_orders (
                                                    'qc_hold', 'fulfilled', 'parse_failed', 'cancelled')),
     order_date     DATE           NOT NULL DEFAULT CURRENT_DATE,
     notes          TEXT,
+    version        INTEGER        NOT NULL DEFAULT 1 CHECK (version >= 1),
     created_at     TIMESTAMPTZ    NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ    NOT NULL DEFAULT now()
 );
