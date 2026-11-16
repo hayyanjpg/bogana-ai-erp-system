@@ -26,7 +26,7 @@ Proyek ini dibangun sebagai portofolio end-to-end untuk posisi **AI Engineer**
 - [Teknologi](#teknologi)
 - [Struktur Repositori](#struktur-repositori)
 - [Quick Start (Docker)](#quick-start-docker)
-- [Deploy Gratis (Render + Neon)](#deploy-gratis-render--neon)
+- [Deploy Gratis (Vercel + Neon)](#deploy-gratis-vercel--neon)
 - [Pengembangan Lokal](#pengembangan-lokal)
 - [API](#api)
 - [Testing & Kualitas Kode](#testing--kualitas-kode)
@@ -122,7 +122,7 @@ Diagram status lengkap dan aturan bisnis: [`docs/PRD_ERP_FLOW.md`](docs/PRD_ERP_
 | Frontend | PHP 8.2, HTML + CSS (tanpa framework) |
 | Database | PostgreSQL 16 |
 | Cache | Redis 7 |
-| Infra | Docker Compose, Render (deploy gratis), GitHub Actions |
+| Infra | Docker Compose, Vercel (deploy gratis), GitHub Actions |
 | Lint/Test | ruff, pytest, `php -l` |
 
 ---
@@ -134,7 +134,6 @@ bogana-ai-erp-system/
 ├── AGENTS.md                     # aturan kontribusi untuk AI & manusia
 ├── README.md
 ├── docker-compose.yml
-├── render.yaml                     # blueprint deploy gratis (Render)
 ├── .env.example
 ├── pyproject.toml                # konfigurasi pytest
 ├── database/
@@ -142,7 +141,7 @@ bogana-ai-erp-system/
 ├── docs/
 │   ├── PRD_ERP_FLOW.md           # alur bisnis end-to-end
 │   ├── API_CONTRACT.md           # kontrak JSON PHP ↔ FastAPI
-│   └── DEPLOY_RENDER_FREE.md     # deploy gratis tanpa kartu kredit
+│   └── DEPLOY_VERCEL.md          # deploy gratis tanpa kartu kredit
 ├── ai_service/                   # Python FastAPI
 │   ├── app/
 │   │   ├── routers/              # health, orders, stocks, dashboard, forecasts
@@ -158,11 +157,11 @@ bogana-ai-erp-system/
 │   └── requirements.txt
 ├── backend/                      # PHP dashboard
 │   ├── public/index.php
-│   ├── public/healthz.php        # health check ringan untuk Render
+│   ├── public/healthz.php        # health check ringan
 │   ├── src/                      # Config, ApiClient, Router, View
 │   ├── templates/                # layout, dashboard, stocks, forecasts, health
-│   ├── docker/000-default.conf
-│   ├── Dockerfile
+│   ├── Caddyfile                 # web server FrankenPHP
+│   ├── Dockerfile                # FrankenPHP + Caddy (Vercel & compose)
 │   └── composer.json
 └── .github/workflows/ci.yml
 ```
@@ -211,31 +210,39 @@ docker compose down -v         # stop + hapus volume (reset database)
 
 ---
 
-## Deploy Gratis (Render + Neon)
+## Deploy Gratis (Vercel + Neon)
 
 Aplikasi ini bisa online **tanpa kartu kredit** dan tanpa biaya bulanan:
 
 | Lapisan | Penyedia | Free tier |
 | --- | --- | --- |
-| PHP + FastAPI | Render | 2 web service, 512 MB RAM, 750 jam/bulan |
+| FastAPI | Vercel (Python runtime) | Hobby: 4 CPU-hours, 100 GB, 1M invocations |
+| Dashboard PHP | Vercel (Container runtime) | Hobby: container beta, scale-to-zero |
 | PostgreSQL | Neon | 1 GB, 100 CU-hours/bulan, scale-to-zero, tanpa kedaluwarsa |
 | Redis | Upstash | 250 MB, 500K commands/bulan (opsional) |
+
+Dua project Vercel dari satu repo:
+
+| Project | Root Directory | URL |
+| --- | --- | --- |
+| `bogana-ai-service` | `ai_service` | `https://bogana-ai-service.vercel.app` |
+| `bogana-php` | `backend` | `https://bogana-php.vercel.app` |
 
 Langkah singkat:
 
 1. Buat project Neon, lalu muat `database/schema.sql` melalui SQL Editor.
 2. (Opsional) Buat database Redis di Upstash dan copy URL `rediss://`.
-3. Render → **New → Blueprint** → pilih repo ini → isi `DATABASE_URL` dan
-   `REDIS_URL`.
-4. Render membangun kedua image dari `render.yaml`; dashboard live di
-   `https://bogana-php.onrender.com`.
+3. Vercel → **Add New → Project** → import repo → **Root Directory** `ai_service` →
+   isi `DATABASE_URL`, `AI_SERVICE_TOKEN`, `AI_SERVICE_AUTH_DISABLED=false`.
+4. Ulangi untuk project kedua dengan **Root Directory** `backend` → isi
+   `AI_SERVICE_URL` (URL project pertama) + token yang sama.
+5. Buka `https://bogana-php.vercel.app`.
 
 Panduan lengkap, batasan free tier, dan troubleshooting:
-[`docs/DEPLOY_RENDER_FREE.md`](docs/DEPLOY_RENDER_FREE.md).
+[`docs/DEPLOY_VERCEL.md`](docs/DEPLOY_VERCEL.md).
 
-> Free web service tidur setelah 15 menit idle (cold start ±1 menit). Render
-> tidak memakai kartu kredit untuk free tier; Render Postgres gratis kedaluwarsa
-> 30 hari, sehingga proyek ini memakai Neon.
+> Vercel Hobby gratis tanpa kartu (untuk proyek portofolio/non-komersial).
+> Container runtime masih beta; instance scale-to-zero setelah 5 menit idle.
 
 ---
 
