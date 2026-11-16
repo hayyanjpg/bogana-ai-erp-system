@@ -6,11 +6,17 @@ namespace Bogana;
 
 use JsonException;
 use RuntimeException;
+use stdClass;
 
 final class ApiClient
 {
     public function __construct(private readonly Config $config)
     {
+    }
+
+    public function baseUrl(): string
+    {
+        return $this->config->aiServiceUrl();
     }
 
     /**
@@ -23,10 +29,21 @@ final class ApiClient
     }
 
     /**
+     * @param array<string, mixed> $payload
      * @param array<string, scalar|null> $query
      * @return array<string, mixed>
      */
-    private function request(string $method, string $path, array $query = []): array
+    public function post(string $path, array $payload = [], array $query = []): array
+    {
+        return $this->request('POST', $path, $query, $payload);
+    }
+
+    /**
+     * @param array<string, scalar|null> $query
+     * @param array<string, mixed>|null $payload
+     * @return array<string, mixed>
+     */
+    private function request(string $method, string $path, array $query = [], ?array $payload = null): array
     {
         $url = $this->config->aiServiceUrl() . $path;
         $query = array_filter(
@@ -42,14 +59,27 @@ final class ApiClient
             $headers[] = 'X-Internal-Token: ' . $this->config->aiServiceToken();
         }
 
-        $context = stream_context_create([
-            'http' => [
-                'method' => $method,
-                'header' => implode("\r\n", $headers),
-                'ignore_errors' => true,
-                'timeout' => $this->config->timeoutSeconds(),
-            ],
-        ]);
+        $body = '';
+        if ($payload !== null) {
+            $headers[] = 'Content-Type: application/json';
+            try {
+                $body = json_encode($payload === [] ? new stdClass() : $payload, JSON_THROW_ON_ERROR);
+            } catch (JsonException $exception) {
+                throw new RuntimeException('Payload tidak dapat dikodekan sebagai JSON', 0, $exception);
+            }
+        }
+
+        $options = [
+            'method' => $method,
+            'header' => implode("\r\n", $headers),
+            'ignore_errors' => true,
+            'timeout' => $this->config->timeoutSeconds(),
+        ];
+        if ($body !== '') {
+            $options['content'] = $body;
+        }
+
+        $context = stream_context_create(['http' => $options]);
 
         $raw = @file_get_contents($url, false, $context);
         if ($raw === false) {
@@ -77,8 +107,12 @@ final class ApiClient
         }
 
         if ($status >= 400) {
-            $message = $data['error']['message'] ?? "AI service mengembalikan status {$status}";
-            throw new ApiException($status, (string) $message);
+            $error = is_array($data['error'] ?? null) ? $data['error'] : [];
+            $message = $error['message'] ?? "AI service mengembalikan status {$status}";
+            $code = $error['code'] ?? 'ERROR';
+            $details = is_array($error['details'] ?? null) ? array_values($error['details']) : [];
+
+            throw new ApiException($status, (string) $message, (string) $code, $details);
         }
 
         return $data;
