@@ -23,6 +23,10 @@ class StockService:
     def __init__(self, repository: StockRepository, cache: JsonCache) -> None:
         self._repository = repository
         self._cache = cache
+        self._dashboard_cache: JsonCache | None = None
+
+    def set_dashboard_cache(self, cache: JsonCache) -> None:
+        self._dashboard_cache = cache
 
     async def list_stocks(self, low_only: bool, category: str | None) -> StockListResponse:
         source, generated_at, ingredients = await self._load()
@@ -94,6 +98,8 @@ class StockService:
         from app.schemas import RestockResponse
         result = await self._repository.restock(sku, quantity)
         await self._cache.delete(CACHE_KEY)
+        if self._dashboard_cache is not None:
+            await self._dashboard_cache.delete("summary")
         return RestockResponse(
             sku=result.sku,
             name=result.name,

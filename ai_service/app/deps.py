@@ -59,8 +59,11 @@ def get_dashboard_cache(client: Redis | None = Depends(get_redis_client)) -> Jso
 def get_stock_service(
     repository: StockRepository = Depends(get_stock_repo),
     cache: JsonCache = Depends(get_stock_cache),
+    dashboard_cache: JsonCache = Depends(get_dashboard_cache),
 ) -> StockService:
-    return StockService(repository, cache)
+    service = StockService(repository, cache)
+    service.set_dashboard_cache(dashboard_cache)
+    return service
 
 
 def get_order_repo(pool: asyncpg.Pool | None = Depends(get_pg_pool)) -> OrderRepository:
