@@ -26,6 +26,7 @@ Proyek ini dibangun sebagai portofolio end-to-end untuk posisi **AI Engineer**
 - [Teknologi](#teknologi)
 - [Struktur Repositori](#struktur-repositori)
 - [Quick Start (Docker)](#quick-start-docker)
+- [Deploy Gratis (Render + Neon)](#deploy-gratis-render--neon)
 - [Pengembangan Lokal](#pengembangan-lokal)
 - [API](#api)
 - [Testing & Kualitas Kode](#testing--kualitas-kode)
@@ -121,7 +122,7 @@ Diagram status lengkap dan aturan bisnis: [`docs/PRD_ERP_FLOW.md`](docs/PRD_ERP_
 | Frontend | PHP 8.2, HTML + CSS (tanpa framework) |
 | Database | PostgreSQL 16 |
 | Cache | Redis 7 |
-| Infra | Docker Compose, GitHub Actions |
+| Infra | Docker Compose, Render (deploy gratis), GitHub Actions |
 | Lint/Test | ruff, pytest, `php -l` |
 
 ---
@@ -133,13 +134,15 @@ bogana-ai-erp-system/
 ├── AGENTS.md                     # aturan kontribusi untuk AI & manusia
 ├── README.md
 ├── docker-compose.yml
+├── render.yaml                     # blueprint deploy gratis (Render)
 ├── .env.example
 ├── pyproject.toml                # konfigurasi pytest
 ├── database/
 │   └── schema.sql                # skema + seed data (source of truth)
 ├── docs/
 │   ├── PRD_ERP_FLOW.md           # alur bisnis end-to-end
-│   └── API_CONTRACT.md           # kontrak JSON PHP ↔ FastAPI
+│   ├── API_CONTRACT.md           # kontrak JSON PHP ↔ FastAPI
+│   └── DEPLOY_RENDER_FREE.md     # deploy gratis tanpa kartu kredit
 ├── ai_service/                   # Python FastAPI
 │   ├── app/
 │   │   ├── routers/              # health, orders, stocks, dashboard, forecasts
@@ -155,6 +158,7 @@ bogana-ai-erp-system/
 │   └── requirements.txt
 ├── backend/                      # PHP dashboard
 │   ├── public/index.php
+│   ├── public/healthz.php        # health check ringan untuk Render
 │   ├── src/                      # Config, ApiClient, Router, View
 │   ├── templates/                # layout, dashboard, stocks, forecasts, health
 │   ├── docker/000-default.conf
@@ -204,6 +208,34 @@ docker compose logs -f php
 docker compose down            # stop
 docker compose down -v         # stop + hapus volume (reset database)
 ```
+
+---
+
+## Deploy Gratis (Render + Neon)
+
+Aplikasi ini bisa online **tanpa kartu kredit** dan tanpa biaya bulanan:
+
+| Lapisan | Penyedia | Free tier |
+| --- | --- | --- |
+| PHP + FastAPI | Render | 2 web service, 512 MB RAM, 750 jam/bulan |
+| PostgreSQL | Neon | 1 GB, 100 CU-hours/bulan, scale-to-zero, tanpa kedaluwarsa |
+| Redis | Upstash | 250 MB, 500K commands/bulan (opsional) |
+
+Langkah singkat:
+
+1. Buat project Neon, lalu muat `database/schema.sql` melalui SQL Editor.
+2. (Opsional) Buat database Redis di Upstash dan copy URL `rediss://`.
+3. Render → **New → Blueprint** → pilih repo ini → isi `DATABASE_URL` dan
+   `REDIS_URL`.
+4. Render membangun kedua image dari `render.yaml`; dashboard live di
+   `https://bogana-php.onrender.com`.
+
+Panduan lengkap, batasan free tier, dan troubleshooting:
+[`docs/DEPLOY_RENDER_FREE.md`](docs/DEPLOY_RENDER_FREE.md).
+
+> Free web service tidur setelah 15 menit idle (cold start ±1 menit). Render
+> tidak memakai kartu kredit untuk free tier; Render Postgres gratis kedaluwarsa
+> 30 hari, sehingga proyek ini memakai Neon.
 
 ---
 
