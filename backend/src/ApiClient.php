@@ -47,13 +47,16 @@ final class ApiClient
                 'method' => $method,
                 'header' => implode("\r\n", $headers),
                 'ignore_errors' => true,
-                'timeout' => 5,
+                'timeout' => $this->config->timeoutSeconds(),
             ],
         ]);
 
         $raw = @file_get_contents($url, false, $context);
         if ($raw === false) {
-            throw new RuntimeException("Tidak dapat menghubungi AI service pada {$url}");
+            error_log(sprintf('Gagal menghubungi AI service: %s', $url));
+            throw new RuntimeException(
+                'AI service tidak dapat dihubungi. Jika baru deploy, tunggu ~1 menit lalu muat ulang halaman.'
+            );
         }
 
         $status = 0;
