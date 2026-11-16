@@ -45,6 +45,8 @@ Proyek ini dibangun sebagai portofolio end-to-end untuk posisi **AI Engineer**
 | Quality control | Order hanya bisa `fulfilled` bila seluruh item punya `qc_logs` `pass`. |
 | Cache Redis | Snapshot stok (60 s), hasil parse (15 menit), agregat dashboard (30 s), fail-open bila Redis mati. |
 | Dashboard PHP | Ringkasan order, stok menipis, order `short`, menu terlaris, forecast, status sistem. |
+| Workbench order | Halaman **Order & parser**: urai teks order, cek kecukupan stok, dan alokasi stok langsung dari UI. |
+| Detail stok | Panel detail per SKU berisi stok, reorder point, harga satuan, dan menu yang memakai bahan tersebut. |
 | Demand forecast | Prakiraan permintaan per menu dengan `confidence` dan `model_version`. |
 | CI/CD | GitHub Actions: `php -l`, `ruff`, `pytest` pada setiap PR ke `main`. |
 
@@ -159,7 +161,7 @@ bogana-ai-erp-system/
 │   ├── public/index.php
 │   ├── public/healthz.php        # health check ringan
 │   ├── src/                      # Config, ApiClient, Router, View
-│   ├── templates/                # layout, dashboard, stocks, forecasts, health
+│   ├── templates/                # layout, dashboard, orders, stocks, forecasts, health
 │   ├── Caddyfile                 # web server FrankenPHP
 │   ├── Dockerfile                # FrankenPHP + Caddy (Vercel & compose)
 │   └── composer.json
@@ -340,7 +342,7 @@ Aturan lengkap ada di [`AGENTS.md`](AGENTS.md). Ringkas:
 
 - [x] Fondasi: schema, PRD, API contract, CI, docker-compose.
 - [x] FastAPI: health, parse-order, stocks, check-stock, allocate, dashboard, forecasts.
-- [x] Dashboard PHP: dashboard, stok, forecast, status.
+- [x] Dashboard PHP: dashboard, order & parser, stok, forecast, status.
 - [ ] Validasi `docker compose up` end-to-end (butuh Docker di mesin berbeda).
 - [ ] Integrasi test dengan PostgreSQL nyata (bukan fake repository).
 - [ ] Screenshot dashboard untuk README.
