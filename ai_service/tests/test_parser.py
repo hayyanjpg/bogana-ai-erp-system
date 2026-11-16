@@ -47,3 +47,21 @@ def test_parse_order_text_merges_duplicate_menu():
     assert len(result.items) == 1
     assert result.items[0].quantity == 15.0
     assert result.warnings[0]["code"] == "DUPLICATE_LINE"
+
+
+def test_parse_order_text_ignores_delivery_instruction_segment():
+    result = parse_order_text(
+        "20 nasi bogana komplit, 12 nasi telur balado, kirim jam 6",
+        MENUS,
+    )
+
+    assert [item.menu.sku for item in result.items] == ["MNU-NBG-01", "MNU-TLB-01"]
+    assert [item.quantity for item in result.items] == [20.0, 12.0]
+    assert all(w["code"] != "MENU_NOT_FOUND" for w in result.warnings)
+
+
+def test_parse_order_text_ignores_instruction_only_segment():
+    result = parse_order_text("kirim jam 6 pagi", MENUS)
+
+    assert result.items == []
+    assert result.warnings == []

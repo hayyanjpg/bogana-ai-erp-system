@@ -48,6 +48,11 @@ SEPARATOR_RE = re.compile(r"[,;\n]|\s+(?:dan|sama|serta|&|\+)\s+", re.IGNORECASE
 NUMBER_RE = re.compile(r"\d+(?:[.,]\d+)?")
 NON_ALNUM_RE = re.compile(r"[^a-z0-9\s]")
 WHITESPACE_RE = re.compile(r"\s+")
+TIME_RE = re.compile(
+    r"\b(?:jam|pukul|wib|wita|wit)\b|\b\d{1,2}\s*[:.]\d{2}\b|\b\d{1,2}(?:\s*(?:pagi|siang|sore|malam))\b",
+    re.IGNORECASE,
+)
+ADDRESS_HINT_RE = re.compile(r"\b(?:kirim|antar|alamat|ke\s+jl|jl\.?|jalan)\b", re.IGNORECASE)
 
 MATCH_THRESHOLD = 0.55
 LOW_CONFIDENCE_THRESHOLD = 0.5
@@ -119,6 +124,17 @@ def content_text(text: str) -> str:
     return " ".join(tokens)
 
 
+def _looks_like_instruction(text: str) -> bool:
+    if TIME_RE.search(text):
+        return True
+    if ADDRESS_HINT_RE.search(text):
+        return True
+    # "kirim jam 6", "diantar jam 7 pagi", "jam 6"
+    if re.search(r"\b(?:kirim|antar|dikirim|diantar)\b", text, re.IGNORECASE):
+        return True
+    return False
+
+
 def _match_score(candidate: str, aliases: Sequence[str]) -> float:
     if not candidate:
         return 0.0
@@ -167,6 +183,9 @@ def parse_order_text(raw_text: str, menus: Sequence[MenuLite]) -> ParseResult:
     for segment in segments:
         quantity_result = extract_quantity(segment)
         candidate = content_text(quantity_result.cleaned_text)
+        if _looks_like_instruction(segment):
+            # Ignore delivery/time/address notes that are not menu items
+            continue
 
         best_menu: MenuLite | None = None
         best_score = 0.0

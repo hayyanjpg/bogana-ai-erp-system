@@ -124,7 +124,7 @@ $statusPill = static function(string $s): string { $t=status_tone($s); return ma
                 <button type="submit" class="px-4 py-2 rounded-lg bg-primary text-on-primary text-[13px] font-medium whitespace-nowrap">Simpan Order</button>
               </form>
             <?php else: ?>
-              <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 text-[12px] text-amber-900">Perbaiki peringatan parser lalu urai ulang sebelum menyimpan order.</div>
+              <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 text-[12px] text-amber-900">Perbaiki peringatan parser lalu urai ulang sebelum menyimpan order. Pindahkan catatan non-menu (jam kirim/alamat/instruksi) ke kolom <strong>Catatan</strong> jika masih terdeteksi.</div>
             <?php endif; ?>
           <?php else: ?>
             <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-900 text-[13px]">Tidak ada item dikenali.</div>
