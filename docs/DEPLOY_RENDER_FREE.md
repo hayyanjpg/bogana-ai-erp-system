@@ -51,6 +51,8 @@ Skema dan seed dimuat ke Neon dari `database/schema.sql`.
      ```
      postgresql://<user>:<password>@ep-xxxx.ap-southeast-1.aws.neon.tech/bogana?sslmode=require
      ```
+   > Neon biasanya menyertakan `&channel_binding=require`. Biarkan apa adanya —
+   > `app/db.py` membuangnya otomatis karena asyncpg belum mendukungnya.
 4. Muat skema + seed:
    - Buka **SQL Editor** di sidebar Neon.
    - Paste **seluruh isi** `database/schema.sql`.
