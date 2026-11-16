@@ -160,6 +160,7 @@ kartu). Untuk demo portofolio, kuota ini lebih dari cukup.
 | Gejala | Penyebab | Solusi |
 | --- | --- | --- |
 | Build FastAPI gagal | Root directory salah / `requirements.txt` tidak ditemukan | Pastikan Root Directory `ai_service` |
+| `FUNCTION_INVOCATION_FAILED` atau `500` pada `/` | Vercel (uv) memilih `pyproject.toml` tanpa tabel `[project]`, sehingga dependensi tidak dipasang | Jangan simpan `pyproject.toml` di root `ai_service`; pakai `ruff.toml` + `pytest.ini` + `requirements.txt` |
 | `500 INTERNAL_ERROR` / `PostgreSQL tidak tersedia` | `DATABASE_URL` salah atau Neon unreachable | Perbaiki env var, redeploy |
 | `401` dari API | `AI_SERVICE_TOKEN` berbeda antara dua project | Samakan token, redeploy |
 | Dashboard menampilkan "AI service tidak dapat dihubungi" | `AI_SERVICE_URL` salah / API cold start | Cek URL project FastAPI, tunggu lalu muat ulang |
