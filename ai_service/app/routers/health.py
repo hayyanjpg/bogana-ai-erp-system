@@ -9,6 +9,16 @@ from app.schemas import HealthResponse
 router = APIRouter(tags=["health"])
 
 
+@router.get("/", include_in_schema=False)
+async def root() -> dict[str, str]:
+    return {
+        "service": "Bogana AI Service",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @router.get("/health", response_model=HealthResponse)
 async def health_check(
     pool=Depends(get_pg_pool),
