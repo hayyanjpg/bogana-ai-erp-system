@@ -1,6 +1,16 @@
 from app.deps import get_pg_pool, get_redis_client
 
 
+def test_root_returns_service_info(client):
+    response = client.get("/")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["service"] == "Bogana AI Service"
+    assert body["version"] == "1.0.0"
+    assert body["docs"] == "/docs"
+
+
 def test_health_ok(client):
     response = client.get("/health")
 

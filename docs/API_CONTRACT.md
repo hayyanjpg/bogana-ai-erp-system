@@ -60,9 +60,20 @@ Semua error mengikuti envelope berikut dan **tidak pernah** mengembalikan
 
 ---
 
-## 2. `GET /health`
+## 2. `GET /` dan `GET /health`
 
-Health check untuk docker healthcheck dan monitoring.
+`GET /` (tanpa autentikasi) mengembalikan identitas service:
+
+```json
+{
+  "service": "Bogana AI Service",
+  "version": "1.0.0",
+  "docs": "/docs",
+  "health": "/health"
+}
+```
+
+`GET /health` untuk docker healthcheck dan monitoring.
 
 **Response 200**
 
@@ -443,6 +454,7 @@ Prakiraan permintaan per menu dari `demand_forecasts`.
 
 | Method | Path | Fungsi | Cache |
 | --- | --- | --- | --- |
+| GET | `/` | Identitas service | - |
 | GET | `/health` | Health check | - |
 | POST | `/v1/parse-order` | Teks -> item menu | Redis 15 m |
 | GET | `/v1/stocks` | Daftar stok | Redis 60 s |
