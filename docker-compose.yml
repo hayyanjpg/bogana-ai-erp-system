@@ -100,6 +100,7 @@ services:
       REDIS_PORT: 6379
       AI_SERVICE_URL: http://ai_service:8000
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-dev-internal-token}
+      AI_SERVICE_TIMEOUT: ${AI_SERVICE_TIMEOUT:-5}
       TZ: ${TZ:-Asia/Jakarta}
     ports:
       - "${PHP_PORT:-8080}:80"
