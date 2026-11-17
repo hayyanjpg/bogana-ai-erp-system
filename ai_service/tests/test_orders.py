@@ -229,8 +229,24 @@ def test_confirm_updates_status(client, order_repo):
 
 def test_record_qc_pass(client, order_repo):
     order_repo.qc_result = QcRecordResult(2, 3, "pass", True, 6)
-    resp = client.post("/v1/orders/2/items/3/qc", json={"checked_by":"admin"})
+    resp = client.post("/v1/orders/2/items/3/qc", json={"checked_by": "admin"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["qc_passed"] is True
     assert body["recorded"] == 6
+
+
+def test_record_qc_requires_payload(client):
+    resp = client.post("/v1/orders/2/items/3/qc")
+
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_record_qc_rejects_empty_checked_by(client):
+    resp = client.post("/v1/orders/2/items/3/qc", json={"checked_by": ""})
+
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["details"][0]["field"] == "checked_by"

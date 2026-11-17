@@ -93,9 +93,9 @@ class StockService:
             return False
         return not (low_only and stock_status(ingredient) == "ok")
 
-
     async def restock(self, sku: str, quantity: float):
         from app.schemas import RestockResponse
+
         result = await self._repository.restock(sku, quantity)
         await self._cache.delete(CACHE_KEY)
         if self._dashboard_cache is not None:

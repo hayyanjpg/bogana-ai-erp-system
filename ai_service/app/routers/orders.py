@@ -81,12 +81,10 @@ async def confirm_order(
 async def record_item_qc(
     order_id: int,
     item_id: int,
-    payload: RecordQcRequest | None = None,
+    payload: RecordQcRequest,
     service: OrderService = Depends(get_order_service),
 ) -> RecordQcResponse:
-    checked_by = payload.checked_by if payload else "system"
-    note = payload.note if payload else None
-    return await service.record_qc_pass(order_id, item_id, checked_by, note)
+    return await service.record_qc_pass(order_id, item_id, payload.checked_by, payload.note)
 
 
 @router.post("/orders/{order_id}/allocate", response_model=AllocateOrderResponse)

@@ -1,9 +1,11 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -14,6 +16,38 @@ from app.errors import AppError
 from app.routers import dashboard, forecasts, health, orders, stocks
 
 logger = logging.getLogger("bogana.ai_service")
+
+VALIDATION_ERROR_RESPONSE: dict[str, Any] = {
+    "description": "Payload tidak valid",
+    "content": {
+        "application/json": {
+            "schema": {
+                "type": "object",
+                "required": ["error"],
+                "properties": {
+                    "error": {
+                        "type": "object",
+                        "required": ["code", "message"],
+                        "properties": {
+                            "code": {"type": "string", "example": "VALIDATION_ERROR"},
+                            "message": {"type": "string"},
+                            "details": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field": {"type": "string"},
+                                        "issue": {"type": "string"},
+                                    },
+                                },
+                            },
+                        },
+                    }
+                },
+            }
+        }
+    },
+}
 
 
 @asynccontextmanager
@@ -108,6 +142,29 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RequestValidationError, handle_validation_error)
     app.add_exception_handler(StarletteHTTPException, handle_http_exception)
     app.add_exception_handler(Exception, handle_unexpected_error)
+
+    def custom_openapi() -> dict[str, Any]:
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+        )
+        for path_item in schema.get("paths", {}).values():
+            for operation in path_item.values():
+                if not isinstance(operation, dict):
+                    continue
+                responses = operation.get("responses")
+                if not isinstance(responses, dict) or "422" not in responses:
+                    continue
+                responses["400"] = VALIDATION_ERROR_RESPONSE
+                del responses["422"]
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = custom_openapi
     return app
 
 
