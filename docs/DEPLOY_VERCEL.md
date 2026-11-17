@@ -94,6 +94,14 @@ Directory**.
    | `AI_SERVICE_AUTH_DISABLED` | `false` |
    | `AI_SERVICE_TIMEOUT` | `60` |
    | `APP_ENV` | `production` |
+   | `DASHBOARD_ACCESS_MODE` | `required` (login) atau `demo` (publik hanya-baca) |
+   | `DASHBOARD_USER` | `admin` |
+   | `DASHBOARD_PASSWORD_HASH` | hasil `php -r "echo password_hash('...', PASSWORD_DEFAULT);"` |
+   | `DASHBOARD_SESSION_SECRET` | string acak minimal 32 karakter |
+   | `DASHBOARD_SESSION_TTL` | `28800` (8 jam) |
+
+   > Tanpa `DASHBOARD_PASSWORD_HASH`, dashboard otomatis berjalan sebagai
+   > **mode demo hanya-baca** agar tidak ada aksi tulis yang terbuka.
 
 4. **Deploy**. Build pertama menarik image FrankenPHP (± 2–4 menit).
 5. Catat URL, misalnya `https://bogana-php.vercel.app`.
@@ -168,6 +176,8 @@ kartu). Untuk demo portofolio, kuota ini lebih dari cukup.
 | URL minta login Vercel | Deployment Protection aktif | Matikan di Settings → Deployment Protection |
 | `relation "ingredients" does not exist` | Skema belum dimuat | Jalankan `database/schema.sql` di Neon SQL Editor |
 | Health menampilkan `redis: down` | `REDIS_URL` kosong | Isi URL Upstash atau abaikan (cache nonaktif) |
+| Dashboard `503 DASHBOARD_NOT_CONFIGURED` | `DASHBOARD_ACCESS_MODE=required` tetapi kredensial kosong | Isi `DASHBOARD_PASSWORD_HASH`, atau ubah mode ke `demo` |
+| Dashboard menampilkan banner "Mode demo (hanya baca)" | Kredensial belum diisi (mode `auto`) | Isi `DASHBOARD_PASSWORD_HASH` lalu redeploy untuk mengaktifkan login |
 
 ---
 

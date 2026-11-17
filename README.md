@@ -276,6 +276,43 @@ Buka http://127.0.0.1:8080.
 
 ---
 
+## Akses Dashboard
+
+Dashboard punya empat mode akses (`DASHBOARD_ACCESS_MODE`):
+
+| Mode | Perilaku | Kapan dipakai |
+| --- | --- | --- |
+| `auto` (default) | Login wajib bila kredensial diisi; jika tidak, hanya-baca | Default aman |
+| `required` | Login wajib, aksi tulis aktif | Produksi / internal |
+| `demo` | Publik, semua aksi tulis ditolak di server | Portofolio publik |
+| `open` | Publik dan boleh menulis | Lokal saja |
+
+Aktifkan login:
+
+```bash
+php -r "echo password_hash('password-anda', PASSWORD_DEFAULT), PHP_EOL;"
+```
+
+Set di Vercel (project `backend`):
+
+| Variabel | Contoh |
+| --- | --- |
+| `DASHBOARD_ACCESS_MODE` | `required` |
+| `DASHBOARD_USER` | `admin` |
+| `DASHBOARD_PASSWORD_HASH` | hasil perintah `password_hash` di atas |
+| `DASHBOARD_SESSION_SECRET` | string acak minimal 32 karakter |
+| `DASHBOARD_SESSION_TTL` | `28800` (8 jam) |
+
+Sesi disimpan sebagai cookie `HttpOnly` + `SameSite=Lax` yang ditandatangani
+HMAC, sehingga tidak bergantung pada session file dan tetap konsisten di runtime
+serverless. Logout tersedia di sidebar dan selalu memakai `POST` + CSRF.
+
+Tanpa kredensial, dashboard otomatis masuk **mode demo hanya-baca**: production
+tetap hidup dan bisa dinilai, tetapi tidak ada aksi tulis yang dieksekusi.
+Detail keputusan desain dan checklist portofolio: [`docs/PORTFOLIO.md`](docs/PORTFOLIO.md).
+
+---
+
 ## API
 
 Kontrak lengkap: [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md).
@@ -315,14 +352,40 @@ pytest -q
 
 # PHP
 find backend -name '*.php' -not -path '*/vendor/*' -print0 | xargs -0 -n1 php -l
+php backend/tests/AuthTest.php
 ```
 
 CI di `.github/workflows/ci.yml` menjalankan:
 
 1. `php -l` untuk seluruh file PHP.
-2. `ruff check .` dan `ruff format --check .`.
-3. `pytest -q` dengan service PostgreSQL 16 + Redis 7, skema dimuat dari
+2. `php backend/tests/AuthTest.php` untuk kontrol akses dashboard.
+3. `ruff check .` dan `ruff format --check .`.
+4. `pytest -q` dengan service PostgreSQL 16 + Redis 7, skema dimuat dari
    `database/schema.sql`.
+
+---
+
+## Studi Kasus: Bug P0 yang Lolos ke Production
+
+Bagian ini merangkum insiden nyata yang ditemukan lewat smoke test production —
+bukan contoh fiktif.
+
+| Tahap | Isi |
+| --- | --- |
+| **Gejala** | Restock bahan selalu mengembalikan `500 INTERNAL_ERROR`, sehingga order berstatus `short` tidak bisa dipulihkan. |
+| **Investigasi** | Halaman dashboard tetap sehat; error hanya muncul pada satu aksi. Log mengarah ke handler generik FastAPI, bukan ke pesan domain. |
+| **Akar masalah** | `StockRepository.restock()` memanggil `self._require_pool()`, padahal method itu hanya didefinisikan di `OrderRepository`, `DashboardRepository`, dan `ForecastRepository`. |
+| **Kenapa lolos** | Test API memakai `FakeStockRepository`, sehingga jalur repository asli tidak pernah dieksekusi. |
+| **Perbaikan** | Menambahkan `_require_pool()` dan memakainya di `list_all`, `list_menu_skus`, serta `restock`. |
+| **Pencegahan** | Regression test memakai `StockRepository` asli dengan fake pool/transaksi, plus smoke test production yang aman. |
+| **Verifikasi** | Setelah deploy: restock `ING-RS-01` berhasil, stok `850 → 850,01`; smoke test production `18 PASS, 0 FAIL, 1 SKIP`. |
+
+Pelajaran yang dibawa ke desain berikutnya:
+
+- Test dengan fake repository bisa menyembunyikan bug nyata; minimal satu test
+  harus menyentuh implementasi asli.
+- Smoke test pasca-deploy lebih murah daripada menemukan bug dari laporan user.
+- Kontrak API, OpenAPI, dan kode harus konsisten (`400`, bukan `422`).
 
 ---
 
@@ -346,6 +409,7 @@ Aturan lengkap ada di [`AGENTS.md`](AGENTS.md). Ringkas:
 - [ ] Validasi `docker compose up` end-to-end (butuh Docker di mesin berbeda).
 - [ ] Integrasi test dengan PostgreSQL nyata (bukan fake repository).
 - [ ] Screenshot dashboard untuk README.
+- [x] Autentikasi dashboard: login, logout, sesi bertanda tangan, dan mode demo hanya-baca.
+- [ ] Audit log perubahan stok (`stock_movements`) dan multi-user dengan role.
 - [ ] Parser berbasis LLM dengan fallback rule-based.
 - [ ] Forecast model v2 (mis. statsmodels/Prophet) + evaluasi confidence.
-- [ ] Autentikasi multi-user & audit log dashboard.
