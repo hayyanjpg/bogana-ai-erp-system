@@ -27,8 +27,9 @@ berjalan bila diaktifkan secara eksplisit.
 - Jangan pernah mengisi `SMOKE_TOKEN` di file yang di-commit.
 
 > Dashboard bisa dikonfigurasi hanya-baca (`DASHBOARD_ACCESS_MODE=demo` atau
-> otomatis saat kredensial belum diisi). Smoke test mendeteksi banner demo dan
-> melewati semua pemeriksaan tulis, sehingga hasil read-only tetap `FAIL: 0`.
+> otomatis saat kredensial belum diisi). Pada mode ini urai pesanan dan cek stok
+> tetap diuji karena tidak menulis data; pemeriksaan QC dan restock otomatis
+> menjadi `SKIP`, sehingga hasil read-only tetap `FAIL: 0`.
 >
 > Bila dashboard memakai login (`DASHBOARD_ACCESS_MODE=required`), isi
 > `SMOKE_DASHBOARD_USER` dan `SMOKE_DASHBOARD_PASSWORD`. Tanpa keduanya,

@@ -280,14 +280,7 @@ def check_php_flows(
         status == 200 and bool(token),
         f"status={status} csrf={'ada' if token else 'tidak ada'}",
     )
-    if read_only:
-        record(
-            results,
-            "POST parse via PHP",
-            None,
-            "dashboard mode demo (hanya baca)",
-        )
-    elif status == 200 and token:
+    if status == 200 and token:
         status, body = form(
             opener,
             web + "/?page=orders",

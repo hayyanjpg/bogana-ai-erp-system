@@ -284,7 +284,7 @@ Dashboard punya empat mode akses (`DASHBOARD_ACCESS_MODE`):
 | --- | --- | --- |
 | `auto` (default) | Login wajib bila kredensial diisi; jika tidak, hanya-baca | Default aman |
 | `required` | Login wajib, aksi tulis aktif | Produksi / internal |
-| `demo` | Publik, semua aksi tulis ditolak di server | Portofolio publik |
+| `demo` | Publik; urai pesanan & cek stok tetap bisa, aksi tulis ditolak | Portofolio publik |
 | `open` | Publik dan boleh menulis | Lokal saja |
 
 Aktifkan login:

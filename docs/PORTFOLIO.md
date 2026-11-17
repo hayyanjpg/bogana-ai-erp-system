@@ -60,7 +60,9 @@ DASHBOARD_ACCESS_MODE=demo
 ```
 
 - Semua halaman dapat dibuka publik.
-- Semua `POST` ditolak dengan `403 DEMO_READ_ONLY`.
+- **Urai pesanan** dan **cek stok** tetap bisa dicoba karena tidak menulis ke database.
+- Aksi yang mengubah data (simpan order, konfirmasi, QC, alokasi, restock)
+  ditolak dengan `403 DEMO_READ_ONLY`.
 - Banner "Mode demo (hanya baca)" tampil di setiap halaman.
 - Tidak perlu membagikan kredensial ke recruiter.
 
