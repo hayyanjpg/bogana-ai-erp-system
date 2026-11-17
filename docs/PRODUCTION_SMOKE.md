@@ -29,6 +29,11 @@ berjalan bila diaktifkan secara eksplisit.
 > Dashboard bisa dikonfigurasi hanya-baca (`DASHBOARD_ACCESS_MODE=demo` atau
 > otomatis saat kredensial belum diisi). Smoke test mendeteksi banner demo dan
 > melewati semua pemeriksaan tulis, sehingga hasil read-only tetap `FAIL: 0`.
+>
+> Bila dashboard memakai login (`DASHBOARD_ACCESS_MODE=required`), isi
+> `SMOKE_DASHBOARD_USER` dan `SMOKE_DASHBOARD_PASSWORD`. Tanpa keduanya,
+> halaman terproteksi dilaporkan `SKIP` (bukan `FAIL`), sehingga tidak ada
+> pemeriksaan palsu yang dianggap lulus.
 
 ## Pemakaian
 
@@ -36,6 +41,13 @@ berjalan bila diaktifkan secara eksplisit.
 # Read-only (aman dijalankan kapan saja)
 SMOKE_WEB_URL="https://<dashboard>.vercel.app" \
 SMOKE_API_URL="https://<ai-service>.vercel.app" \
+python scripts/production_smoke.py
+
+# Dashboard ber-login (uji halaman terproteksi)
+SMOKE_WEB_URL="https://<dashboard>.vercel.app" \
+SMOKE_API_URL="https://<ai-service>.vercel.app" \
+SMOKE_DASHBOARD_USER="admin" \
+SMOKE_DASHBOARD_PASSWORD="<password>" \
 python scripts/production_smoke.py
 
 # Dengan uji API langsung (butuh token internal)
@@ -48,6 +60,8 @@ python scripts/production_smoke.py
 SMOKE_WEB_URL="https://<dashboard>.vercel.app" \
 SMOKE_API_URL="https://<ai-service>.vercel.app" \
 SMOKE_ALLOW_WRITE=1 \
+SMOKE_DASHBOARD_USER="admin" \
+SMOKE_DASHBOARD_PASSWORD="<password>" \
 SMOKE_SKU="ING-RS-01" \
 SMOKE_QTY="0.01" \
 python scripts/production_smoke.py
@@ -58,6 +72,8 @@ PowerShell:
 ```powershell
 $env:SMOKE_WEB_URL = "https://<dashboard>.vercel.app"
 $env:SMOKE_API_URL = "https://<ai-service>.vercel.app"
+$env:SMOKE_DASHBOARD_USER = "admin"
+$env:SMOKE_DASHBOARD_PASSWORD = "<password>"
 python scripts/production_smoke.py
 ```
 

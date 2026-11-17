@@ -10,6 +10,8 @@ Environment:
     SMOKE_ALLOW_WRITE "1" untuk mengaktifkan uji restock (default: mati)
     SMOKE_SKU         SKU bahan untuk uji restock (default: ING-RS-01)
     SMOKE_QTY         Jumlah restock (default: 0.01)
+    SMOKE_DASHBOARD_USER     Username login dashboard (opsional)
+    SMOKE_DASHBOARD_PASSWORD Password login dashboard (opsional)
 """
 
 from __future__ import annotations
@@ -136,9 +138,63 @@ def check_api(
     )
 
 
-def check_web(
-    results: Results, opener: urllib.request.OpenerDirector, web: str
+def is_login_page(html: str) -> bool:
+    return "Masuk ke dashboard" in html
+
+
+def dashboard_login(
+    opener: urllib.request.OpenerDirector,
+    web: str,
+    username: str,
+    password: str,
 ) -> bool:
+    _, body, _ = fetch(opener, web + "/?page=login")
+    token = csrf_token(body)
+    if not token:
+        return False
+
+    status, body, _ = fetch(
+        opener,
+        web + "/?page=login",
+        data=urllib.parse.urlencode(
+            {"csrf_token": token, "username": username, "password": password}
+        ).encode("utf-8"),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+
+    # Login dianggap berhasil bila server tidak lagi menampilkan halaman login.
+    # Status akhir bisa 5xx bila AI service bermasalah; itu bukan kegagalan login.
+    return status != 0 and not is_login_page(body)
+
+
+def check_web(
+    results: Results,
+    opener: urllib.request.OpenerDirector,
+    web: str,
+    username: str,
+    password: str,
+) -> tuple[bool, bool]:
+    _, body, _ = fetch(opener, web + "/")
+    requires_login = is_login_page(body)
+    authenticated = not requires_login
+
+    if requires_login:
+        if username and password:
+            authenticated = dashboard_login(opener, web, username, password)
+            record(
+                results,
+                "Login dashboard",
+                authenticated,
+                "berhasil" if authenticated else "gagal — periksa kredensial smoke",
+            )
+        else:
+            record(
+                results,
+                "Login dashboard",
+                None,
+                "SMOKE_DASHBOARD_USER/PASSWORD tidak diisi",
+            )
+
     pages = {
         "Dashboard": web + "/",
         "Orders": web + "/?page=orders",
@@ -151,10 +207,16 @@ def check_web(
         status, body, _ = fetch(opener, url)
         if label == "Dashboard":
             read_only = is_read_only(body)
+        if requires_login and not authenticated:
+            record(results, f"Halaman {label}", None, "butuh login dashboard")
+            continue
         record(
             results,
             f"Halaman {label}",
-            status == 200 and "Bogana AI ERP" in body and "INTERNAL_ERROR" not in body,
+            status == 200
+            and "Bogana AI ERP" in body
+            and "INTERNAL_ERROR" not in body
+            and not is_login_page(body),
             f"status={status}",
         )
 
@@ -177,14 +239,20 @@ def check_web(
     status, _, _ = fetch(opener, web + "/?page=does-not-exist")
     record(results, "Halaman 404", status == 404, f"status={status}")
 
-    record(
-        results,
-        "Mode dashboard",
-        True,
-        "demo (hanya baca)" if read_only else "akses tulis aktif",
-    )
+    if requires_login:
+        mode_detail = (
+            "login aktif, terautentikasi"
+            if authenticated
+            else "login aktif, belum terautentikasi"
+        )
+    elif read_only:
+        mode_detail = "demo (hanya baca)"
+    else:
+        mode_detail = "akses tulis terbuka"
 
-    return read_only
+    record(results, "Mode dashboard", True, mode_detail)
+
+    return read_only, authenticated
 
 
 def check_php_flows(
@@ -192,7 +260,18 @@ def check_php_flows(
     opener: urllib.request.OpenerDirector,
     web: str,
     read_only: bool,
+    authenticated: bool,
 ) -> None:
+    if not authenticated:
+        for name in (
+            "POST parse via PHP",
+            "GET forecasts via PHP",
+            "Validasi QC (checked_by terlalu panjang)",
+        ):
+            record(results, name, None, "butuh login dashboard")
+
+        return
+
     status, body, _ = fetch(opener, web + "/?page=orders")
     token = csrf_token(body)
     record(
@@ -283,7 +362,17 @@ def check_restock(
     sku: str,
     quantity: str,
     read_only: bool,
+    authenticated: bool,
 ) -> None:
+    if not authenticated:
+        record(
+            results,
+            f"POST restock {sku} qty={quantity}",
+            None,
+            "butuh login dashboard",
+        )
+        return
+
     if read_only:
         record(
             results,
@@ -354,6 +443,8 @@ def main() -> int:
     sku = os.environ.get("SMOKE_SKU", "ING-RS-01")
     quantity = os.environ.get("SMOKE_QTY", "0.01")
     token = os.environ.get("SMOKE_TOKEN", "")
+    dashboard_user = os.environ.get("SMOKE_DASHBOARD_USER", "")
+    dashboard_password = os.environ.get("SMOKE_DASHBOARD_PASSWORD", "")
 
     jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
@@ -364,7 +455,9 @@ def main() -> int:
 
     results: Results = []
     check_api(results, opener, api)
-    read_only = check_web(results, opener, web)
+    read_only, authenticated = check_web(
+        results, opener, web, dashboard_user, dashboard_password
+    )
 
     if token:
         status, body, _ = fetch(
@@ -397,10 +490,10 @@ def main() -> int:
             results, "POST /v1/parse-order langsung", None, "SMOKE_TOKEN tidak diisi"
         )
 
-    check_php_flows(results, opener, web, read_only)
+    check_php_flows(results, opener, web, read_only, authenticated)
 
     if allow_write:
-        check_restock(results, opener, web, sku, quantity, read_only)
+        check_restock(results, opener, web, sku, quantity, read_only, authenticated)
     else:
         record(results, "Restock (write)", None, "SMOKE_ALLOW_WRITE tidak diaktifkan")
 
