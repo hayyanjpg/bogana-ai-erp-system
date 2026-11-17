@@ -21,6 +21,7 @@ from app.domain import (
     TopMenu,
 )
 from app.errors import (
+    BusinessRuleError,
     ConflictError,
     DependencyUnavailableError,
     InsufficientStockError,
@@ -113,19 +114,25 @@ class StockRepository:
         return [row["sku"] for row in rows]
 
     async def restock(self, sku: str, quantity: float) -> RestockResult:
+        if quantity <= 0:
+            raise BusinessRuleError(
+                "quantity harus lebih besar dari 0",
+                details=[{"field": "quantity", "issue": "must be greater than 0"}],
+            )
         pool = self._require_pool()
-        row = await pool.fetchrow(
-            "UPDATE ingredients SET stock_on_hand = stock_on_hand + $2 "
-            "WHERE sku = $1 RETURNING sku, name, unit, stock_on_hand, reorder_point",
-            sku,
-            quantity,
-        )
-        if row is None:
-            raise NotFoundError(f"Ingredient {sku} tidak ditemukan")
-        stock = float(row["stock_on_hand"])
-        rop = float(row["reorder_point"])
-        status = "out" if stock <= 0 else "low" if stock <= rop else "ok"
-        return RestockResult(row["sku"], row["name"], row["unit"], stock, status)
+        async with pool.acquire() as conn, conn.transaction():
+            row = await conn.fetchrow(
+                "UPDATE ingredients SET stock_on_hand = stock_on_hand + $2 "
+                "WHERE sku = $1 RETURNING sku, name, unit, stock_on_hand, reorder_point",
+                sku,
+                quantity,
+            )
+            if row is None:
+                raise NotFoundError(f"Ingredient {sku} tidak ditemukan")
+            stock = float(row["stock_on_hand"])
+            rop = float(row["reorder_point"])
+            status = "out" if stock <= 0 else "low" if stock <= rop else "ok"
+            return RestockResult(row["sku"], row["name"], row["unit"], stock, status)
 
 
 class OrderRepository:
