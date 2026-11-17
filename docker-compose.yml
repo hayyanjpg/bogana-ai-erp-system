@@ -101,6 +101,11 @@ services:
       AI_SERVICE_URL: http://ai_service:8000
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-dev-internal-token}
       AI_SERVICE_TIMEOUT: ${AI_SERVICE_TIMEOUT:-5}
+      # Lokal: dashboard boleh menulis tanpa login. Production: pakai auto/required.
+      DASHBOARD_ACCESS_MODE: ${DASHBOARD_ACCESS_MODE:-open}
+      DASHBOARD_USER: ${DASHBOARD_USER:-admin}
+      DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH:-}
+      DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:-}
       TZ: ${TZ:-Asia/Jakarta}
     ports:
       - "${PHP_PORT:-8080}:80"
