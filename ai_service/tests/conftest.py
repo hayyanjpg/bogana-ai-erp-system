@@ -170,7 +170,13 @@ class FakeStockRepository:
                     stock_on_hand=stock, reorder_point=ing.reorder_point,
                     unit_cost=ing.unit_cost, category=ing.category,
                 )
-                return RestockResult(sku=ing.sku, name=ing.name, unit=ing.unit, stock_on_hand=stock, status=status)
+                return RestockResult(
+                    sku=ing.sku,
+                    name=ing.name,
+                    unit=ing.unit,
+                    stock_on_hand=stock,
+                    status=status,
+                )
         from app.errors import NotFoundError
         raise NotFoundError(f"Ingredient {sku} tidak ditemukan")
 
@@ -202,8 +208,10 @@ class FakeOrderRepository:
         return self.allocation
 
     async def save_from_parse(self, payload, items):
-        from app.domain import SavedOrder
         from datetime import date
+
+        from app.domain import SavedOrder
+
         if self.saved is not None:
             return self.saved
         d = payload.order_date or date.today()
