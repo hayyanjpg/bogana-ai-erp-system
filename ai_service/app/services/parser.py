@@ -130,9 +130,7 @@ def _looks_like_instruction(text: str) -> bool:
     if ADDRESS_HINT_RE.search(text):
         return True
     # "kirim jam 6", "diantar jam 7 pagi", "jam 6"
-    return bool(
-        re.search(r"\b(?:kirim|antar|dikirim|diantar)\b", text, re.IGNORECASE)
-    )
+    return bool(re.search(r"\b(?:kirim|antar|dikirim|diantar)\b", text, re.IGNORECASE))
 
 
 def _match_score(candidate: str, aliases: Sequence[str]) -> float:

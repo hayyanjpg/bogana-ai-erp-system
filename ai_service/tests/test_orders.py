@@ -229,7 +229,7 @@ def test_confirm_updates_status(client, order_repo):
 
 def test_record_qc_pass(client, order_repo):
     order_repo.qc_result = QcRecordResult(2, 3, "pass", True, 6)
-    resp = client.post("/v1/orders/2/items/3/qc", json={"checked_by":"admin"})
+    resp = client.post("/v1/orders/2/items/3/qc", json={"checked_by": "admin"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["qc_passed"] is True

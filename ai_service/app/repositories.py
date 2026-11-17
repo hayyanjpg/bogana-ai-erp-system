@@ -263,7 +263,6 @@ class OrderRepository:
             )
 
 
-
 ORDER_ITEMS_SQL = """
 SELECT oi.id, m.sku AS menu_sku, m.name AS menu_name,
        oi.quantity::float8 AS quantity, oi.unit_price::float8 AS unit_price,
@@ -450,7 +449,8 @@ class _OrderExtMixin:
         async with pool.acquire() as conn, conn.transaction():
             row = await conn.fetchrow(
                 "SELECT oi.id FROM order_items oi WHERE oi.id=$1 AND oi.order_id=$2 FOR UPDATE",
-                item_id, order_id,
+                item_id,
+                order_id,
             )
             if row is None:
                 raise NotFoundError(f"Item {item_id} pada order {order_id} tidak ditemukan")

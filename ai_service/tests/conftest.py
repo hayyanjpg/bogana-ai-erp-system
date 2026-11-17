@@ -159,6 +159,7 @@ class FakeStockRepository:
 
     async def restock(self, sku: str, quantity: float):
         from app.domain import RestockResult
+
         self.restock_calls.append((sku, quantity))
         for i, ing in enumerate(self._ingredients):
             if ing.sku == sku:
@@ -166,9 +167,14 @@ class FakeStockRepository:
                 rop = ing.reorder_point
                 status = "out" if stock <= 0 else "low" if stock <= rop else "ok"
                 self._ingredients[i] = Ingredient(
-                    id=ing.id, sku=ing.sku, name=ing.name, unit=ing.unit,
-                    stock_on_hand=stock, reorder_point=ing.reorder_point,
-                    unit_cost=ing.unit_cost, category=ing.category,
+                    id=ing.id,
+                    sku=ing.sku,
+                    name=ing.name,
+                    unit=ing.unit,
+                    stock_on_hand=stock,
+                    reorder_point=ing.reorder_point,
+                    unit_cost=ing.unit_cost,
+                    category=ing.category,
                 )
                 return RestockResult(
                     sku=ing.sku,
@@ -178,6 +184,7 @@ class FakeStockRepository:
                     status=status,
                 )
         from app.errors import NotFoundError
+
         raise NotFoundError(f"Ingredient {sku} tidak ditemukan")
 
 
