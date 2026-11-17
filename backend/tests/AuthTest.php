@@ -104,6 +104,15 @@ withEnv(['DASHBOARD_ACCESS_MODE' => 'ngawur'], function (): void {
     check('mode tidak dikenal jatuh ke auto', Auth::fromEnv()->mode() === Auth::MODE_DEMO);
 });
 
+// --- Aksi yang tetap aman pada mode demo ----------------------------------
+
+check('demo mengizinkan urai pesanan', Auth::demoAllowsAction('orders', 'parse'));
+check('demo mengizinkan cek stok', Auth::demoAllowsAction('orders', 'check'));
+check('demo menolak simpan order', !Auth::demoAllowsAction('orders', 'save'));
+check('demo menolak QC', !Auth::demoAllowsAction('orders', 'qc'));
+check('demo menolak alokasi', !Auth::demoAllowsAction('orders', 'allocate'));
+check('demo menolak restock', !Auth::demoAllowsAction('stocks', 'restock'));
+
 // --- Verifikasi kredensial ------------------------------------------------
 
 withEnv(['DASHBOARD_PASSWORD_HASH' => $hash, 'DASHBOARD_USER' => 'operator'], function (): void {
