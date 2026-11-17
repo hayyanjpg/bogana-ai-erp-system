@@ -13,6 +13,8 @@ berjalan bila diaktifkan secara eksplisit.
 - Alur CSRF dashboard untuk parse order dan halaman forecast.
 - Validasi error QC (`checked_by` terlalu panjang) — tidak menulis data.
 - Uji restock opsional dengan kuantitas kecil pada SKU tertentu.
+- Deteksi mode demo: bila dashboard berjalan hanya-baca, pemeriksaan tulis
+  otomatis menjadi `SKIP` (bukan `FAIL`).
 
 ## Keamanan
 
@@ -23,6 +25,10 @@ berjalan bila diaktifkan secara eksplisit.
 - Restock hanya berjalan dengan `SMOKE_ALLOW_WRITE=1` dan menambah stok sebesar
   `SMOKE_QTY` (default `0.01`) pada `SMOKE_SKU` (default `ING-RS-01`).
 - Jangan pernah mengisi `SMOKE_TOKEN` di file yang di-commit.
+
+> Dashboard bisa dikonfigurasi hanya-baca (`DASHBOARD_ACCESS_MODE=demo` atau
+> otomatis saat kredensial belum diisi). Smoke test mendeteksi banner demo dan
+> melewati semua pemeriksaan tulis, sehingga hasil read-only tetap `FAIL: 0`.
 
 ## Pemakaian
 

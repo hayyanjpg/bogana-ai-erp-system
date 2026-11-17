@@ -68,6 +68,10 @@ def text_only(html: str) -> str:
     return re.sub(r"\s+", " ", text).replace("&amp;", "&")
 
 
+def is_read_only(html: str) -> bool:
+    return 'data-demo-mode="read-only"' in html
+
+
 def csrf_token(html: str) -> str:
     match = re.search(r'name="csrf_token" value="([a-f0-9]{64})"', html)
     return match.group(1) if match else ""
@@ -134,7 +138,7 @@ def check_api(
 
 def check_web(
     results: Results, opener: urllib.request.OpenerDirector, web: str
-) -> None:
+) -> bool:
     pages = {
         "Dashboard": web + "/",
         "Orders": web + "/?page=orders",
@@ -142,8 +146,11 @@ def check_web(
         "Forecasts": web + "/?page=forecasts",
         "Health": web + "/?page=health",
     }
+    read_only = False
     for label, url in pages.items():
         status, body, _ = fetch(opener, url)
+        if label == "Dashboard":
+            read_only = is_read_only(body)
         record(
             results,
             f"Halaman {label}",
@@ -170,11 +177,21 @@ def check_web(
     status, _, _ = fetch(opener, web + "/?page=does-not-exist")
     record(results, "Halaman 404", status == 404, f"status={status}")
 
+    record(
+        results,
+        "Mode dashboard",
+        True,
+        "demo (hanya baca)" if read_only else "akses tulis aktif",
+    )
+
+    return read_only
+
 
 def check_php_flows(
     results: Results,
     opener: urllib.request.OpenerDirector,
     web: str,
+    read_only: bool,
 ) -> None:
     status, body, _ = fetch(opener, web + "/?page=orders")
     token = csrf_token(body)
@@ -184,7 +201,14 @@ def check_php_flows(
         status == 200 and bool(token),
         f"status={status} csrf={'ada' if token else 'tidak ada'}",
     )
-    if status == 200 and token:
+    if read_only:
+        record(
+            results,
+            "POST parse via PHP",
+            None,
+            "dashboard mode demo (hanya baca)",
+        )
+    elif status == 200 and token:
         status, body = form(
             opener,
             web + "/?page=orders",
@@ -217,6 +241,16 @@ def check_php_flows(
         f"status={status}",
     )
 
+    if read_only:
+        record(
+            results,
+            "Validasi QC (checked_by terlalu panjang)",
+            None,
+            "dashboard mode demo (hanya baca)",
+        )
+
+        return
+
     status, body, _ = fetch(opener, web + "/?page=orders")
     token = csrf_token(body)
     if token:
@@ -248,7 +282,17 @@ def check_restock(
     web: str,
     sku: str,
     quantity: str,
+    read_only: bool,
 ) -> None:
+    if read_only:
+        record(
+            results,
+            f"POST restock {sku} qty={quantity}",
+            None,
+            "dashboard mode demo (hanya baca)",
+        )
+        return
+
     status, body, _ = fetch(opener, f"{web}/?page=stocks&sku={urllib.parse.quote(sku)}")
     text = text_only(body)
     before_match = re.search(r"Stok vs Reorder Point\s+([0-9.,]+)", text)
@@ -320,7 +364,7 @@ def main() -> int:
 
     results: Results = []
     check_api(results, opener, api)
-    check_web(results, opener, web)
+    read_only = check_web(results, opener, web)
 
     if token:
         status, body, _ = fetch(
@@ -353,10 +397,10 @@ def main() -> int:
             results, "POST /v1/parse-order langsung", None, "SMOKE_TOKEN tidak diisi"
         )
 
-    check_php_flows(results, opener, web)
+    check_php_flows(results, opener, web, read_only)
 
     if allow_write:
-        check_restock(results, opener, web, sku, quantity)
+        check_restock(results, opener, web, sku, quantity, read_only)
     else:
         record(results, "Restock (write)", None, "SMOKE_ALLOW_WRITE tidak diaktifkan")
 
