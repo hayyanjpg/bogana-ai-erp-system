@@ -8,8 +8,13 @@ use RuntimeException;
 
 final class View
 {
-    public function __construct(private readonly string $templatePath)
-    {
+    /**
+     * @param array<string, mixed> $shared Data yang tersedia di setiap template.
+     */
+    public function __construct(
+        private readonly string $templatePath,
+        private readonly array $shared = [],
+    ) {
     }
 
     /**
@@ -17,12 +22,22 @@ final class View
      */
     public function render(string $template, array $data = [], string $layout = 'layout'): string
     {
-        $content = $this->renderTemplate($template, $data);
+        $content = $this->renderTemplate($template, array_merge($this->shared, $data));
 
-        return $this->renderTemplate($layout, [
+        return $this->renderTemplate($layout, array_merge($this->shared, [
             'content' => $content,
             'title' => $data['title'] ?? 'Bogana ERP',
-        ]);
+        ]));
+    }
+
+    /**
+     * Render satu template tanpa layout (mis. halaman login).
+     *
+     * @param array<string, mixed> $data
+     */
+    public function renderRaw(string $template, array $data = []): string
+    {
+        return $this->renderTemplate($template, array_merge($this->shared, $data));
     }
 
     /**

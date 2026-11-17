@@ -15,12 +15,42 @@ final class Router
     public function __construct(
         private readonly ApiClient $api,
         private readonly View $view,
+        private readonly Auth $auth,
     ) {
     }
 
     public function dispatch(string $page): void
     {
         try {
+            if ($this->auth->misconfigured()) {
+                $this->renderError(
+                    503,
+                    'Dashboard belum dikonfigurasi: isi DASHBOARD_PASSWORD_HASH '
+                    . 'atau DASHBOARD_PASSWORD, atau set DASHBOARD_ACCESS_MODE=demo.',
+                    'DASHBOARD_NOT_CONFIGURED',
+                );
+
+                return;
+            }
+
+            if ($page === 'login') {
+                $this->login();
+
+                return;
+            }
+
+            if ($page === 'logout') {
+                $this->logout();
+
+                return;
+            }
+
+            if ($this->auth->requiresLogin() && !$this->auth->isAuthenticated()) {
+                $this->login();
+
+                return;
+            }
+
             if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $this->dispatchPost($page);
 
@@ -47,8 +77,92 @@ final class Router
         }
     }
 
+    private function login(): void
+    {
+        if (!$this->auth->requiresLogin()) {
+            $this->redirect('?page=dashboard');
+
+            return;
+        }
+
+        if ($this->auth->isAuthenticated()) {
+            $this->redirect('?page=dashboard');
+
+            return;
+        }
+
+        $error = null;
+        $username = '';
+
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+            $username = trim((string) ($_POST['username'] ?? ''));
+            $password = (string) ($_POST['password'] ?? '');
+
+            if (!csrf_valid()) {
+                http_response_code(419);
+                $error = 'Sesi form sudah kedaluwarsa. Muat ulang halaman lalu coba lagi.';
+            } elseif ($this->auth->attempt($username, $password)) {
+                $this->auth->login($username);
+                $this->redirect('?page=dashboard');
+
+                return;
+            } else {
+                // Memperlambat brute force tanpa menyimpan state di server.
+                usleep(300000);
+                http_response_code(401);
+                $error = 'Username atau password salah.';
+            }
+        }
+
+        echo $this->view->renderRaw('login', [
+            'title' => 'Masuk',
+            'error' => $error,
+            'username' => $username,
+        ]);
+    }
+
+    private function logout(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            $this->redirect('?page=dashboard');
+
+            return;
+        }
+
+        if (!csrf_valid()) {
+            $this->renderError(
+                419,
+                'Sesi form sudah kedaluwarsa. Muat ulang halaman lalu kirim ulang.',
+                'CSRF_EXPIRED',
+            );
+
+            return;
+        }
+
+        $this->auth->logout();
+        $this->redirect('?page=login');
+    }
+
+    private function redirect(string $location): void
+    {
+        if (!headers_sent()) {
+            header('Location: ' . $location, true, 303);
+        }
+    }
+
     private function dispatchPost(string $page): void
     {
+        if ($this->auth->isReadOnly()) {
+            $this->renderError(
+                403,
+                'Dashboard berjalan dalam mode demo (hanya baca). '
+                . 'Aksi tulis dinonaktifkan; set DASHBOARD_PASSWORD_HASH untuk mengaktifkan mode login.',
+                'DEMO_READ_ONLY',
+            );
+
+            return;
+        }
+
         if (!csrf_valid()) {
             $this->renderError(
                 419,
