@@ -81,10 +81,14 @@ class StockRepository:
     def __init__(self, pool: asyncpg.Pool | None) -> None:
         self._pool = pool
 
-    async def list_all(self) -> list[Ingredient]:
+    def _require_pool(self) -> asyncpg.Pool:
         if self._pool is None:
             raise DependencyUnavailableError("PostgreSQL tidak tersedia")
-        rows = await self._pool.fetch(
+        return self._pool
+
+    async def list_all(self) -> list[Ingredient]:
+        pool = self._require_pool()
+        rows = await pool.fetch(
             "SELECT id, sku, name, unit, stock_on_hand, reorder_point, unit_cost, category "
             "FROM ingredients ORDER BY sku"
         )
@@ -103,9 +107,8 @@ class StockRepository:
         ]
 
     async def list_menu_skus(self, ingredient_id: int) -> list[str]:
-        if self._pool is None:
-            raise DependencyUnavailableError("PostgreSQL tidak tersedia")
-        rows = await self._pool.fetch(
+        pool = self._require_pool()
+        rows = await pool.fetch(
             "SELECT m.sku FROM menus m "
             "JOIN menu_recipes mr ON mr.menu_id = m.id "
             "WHERE mr.ingredient_id = $1 ORDER BY m.sku",
