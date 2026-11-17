@@ -58,7 +58,7 @@ $nav = [
     </script>
     <link rel="stylesheet" href="assets/app.css">
 </head>
-<body class="bg-surface text-on-surface font-body antialiased">
+<body class="bg-surface text-on-surface font-body antialiased" data-read-only="<?= ($readOnly ?? false) ? '1' : '0' ?>">
 <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[60] focus:bg-on-surface focus:text-white focus:px-3 focus:py-2 focus:rounded">Lewati ke konten</a>
 <aside class="app-sidebar fixed left-0 top-0 h-full w-[260px] bg-surface-container-lowest border-r border-outline-variant/40 z-50 flex flex-col justify-between select-none transition-transform duration-200">
   <div class="flex flex-col min-h-0">
@@ -98,8 +98,17 @@ $nav = [
       <span class="tabular text-[13px] text-on-surface font-medium" data-clock><?= e(date('H:i')) ?> WIB</span>
     </div>
     <div class="pt-1 border-t border-outline-variant/20 flex items-center justify-between">
-      <div class="flex items-center gap-2 min-w-0"><div class="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[16px]">person</span></div><div class="flex flex-col min-w-0"><span class="text-[11px] text-on-surface font-medium truncate">B2B Ops Lead</span><span class="text-[10px] text-on-surface-variant truncate">Admin Operasional</span></div></div>
-      <span class="material-symbols-outlined text-on-surface-variant text-[16px]">settings</span>
+      <div class="flex items-center gap-2 min-w-0"><div class="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[16px]">person</span></div><div class="flex flex-col min-w-0"><span class="text-[11px] text-on-surface font-medium truncate"><?= e($currentUser ?? 'Tamu') ?></span><span class="text-[10px] text-on-surface-variant truncate"><?= ($readOnly ?? false) ? 'Akses demo' : 'Admin Operasional' ?></span></div></div>
+      <?php if ($canLogout ?? false): ?>
+        <form method="post" action="?page=logout" class="inline-flex">
+          <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+          <button type="submit" class="text-on-surface-variant hover:text-error transition-colors" title="Keluar" aria-label="Keluar">
+            <span class="material-symbols-outlined text-[16px]">logout</span>
+          </button>
+        </form>
+      <?php else: ?>
+        <span class="material-symbols-outlined text-on-surface-variant text-[16px]">settings</span>
+      <?php endif; ?>
     </div>
   </div>
 </aside>
@@ -118,6 +127,12 @@ $nav = [
     </div>
   </header>
   <main id="main" class="relative pt-14 flex-1">
+    <?php if ($readOnly ?? false): ?>
+      <div data-demo-mode="read-only" class="mx-6 mt-4 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 px-4 py-2 text-[12px] flex items-start gap-2">
+        <span class="material-symbols-outlined text-[16px] leading-5">visibility</span>
+        <span><strong>Mode demo (hanya baca).</strong> Data contoh untuk portofolio — aksi tulis dinonaktifkan di server, tetapi <em>urai pesanan</em> dan <em>cek stok</em> tetap bisa dicoba.</span>
+      </div>
+    <?php endif; ?>
     <div class="w-full px-6 py-6">
       <?= $content ?>
     </div>
@@ -129,6 +144,13 @@ $nav = [
 </div>
 <script>
 (function(){
+  if(document.body.getAttribute('data-read-only')==='1'){
+    document.querySelectorAll('form[method="post"] button[type="submit"]').forEach(function(b){
+      var f=b.closest('form');
+      if(f&&f.hasAttribute('data-demo-allow'))return;
+      b.disabled=true;b.classList.add('opacity-50','cursor-not-allowed');b.title='Mode demo: hanya baca';
+    });
+  }
   var clock=document.querySelector('[data-clock]');
   if(clock){var tick=function(){try{clock.textContent=new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(new Date())+' WIB';}catch(e){}};tick();setInterval(tick,30000);} 
   document.querySelectorAll('form[data-submit-lock]').forEach(function(f){f.addEventListener('submit',function(){var b=f.querySelector('button[type="submit"]');if(b){b.disabled=true;b.classList.add('opacity-70');}});});
