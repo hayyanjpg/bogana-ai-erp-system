@@ -90,7 +90,7 @@ $nav = [
   </div>
   <div class="p-3 border-t border-outline-variant/30 flex flex-col gap-2 bg-surface-container-lowest">
     <a href="?page=health" class="flex items-center justify-between px-2 py-1 rounded bg-surface-container-low border border-outline-variant/20 hover:border-primary/40 transition-colors">
-      <div class="flex items-center gap-1.5"><span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span></span><span class="text-[11px] text-on-surface font-medium">FastAPI :8000</span></div>
+      <div class="flex items-center gap-1.5"><span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span></span><span class="text-[11px] text-on-surface font-medium">FastAPI</span></div>
       <span class="text-[10px] text-primary font-medium uppercase">Terhubung</span>
     </a>
     <div class="flex items-center justify-between text-on-surface-variant px-2">
