@@ -159,8 +159,16 @@ class OrderService:
             insufficient=insufficient,
         )
 
-    async def record_qc_pass(self, order_id: int, item_id: int, checked_by: str, note: str | None) -> RecordQcResponse:
-        result: QcRecordResult = await self._repository.record_qc_pass(order_id, item_id, checked_by, note)
+    async def record_qc_pass(
+        self,
+        order_id: int,
+        item_id: int,
+        checked_by: str,
+        note: str | None,
+    ) -> RecordQcResponse:
+        result: QcRecordResult = await self._repository.record_qc_pass(
+            order_id, item_id, checked_by, note
+        )
         return RecordQcResponse(
             order_id=result.order_id,
             order_item_id=result.order_item_id,
