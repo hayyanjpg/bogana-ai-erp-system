@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Smoke test production untuk dashboard PHP dan AI service FastAPI.
 
 Default bersifat read-only. Uji restock hanya berjalan bila SMOKE_ALLOW_WRITE=1
