@@ -52,6 +52,14 @@ Proyek ini dibangun sebagai portofolio end-to-end untuk posisi **AI Engineer**
 
 ---
 
+## Screenshots
+
+| Dashboard | Stok Bahan |
+| --- | --- |
+| ![Dashboard](docs/screenshots/01-dashboard.png) | ![Stok](docs/screenshots/02-stok.png) |
+
+---
+
 ## Arsitektur
 
 ```mermaid
