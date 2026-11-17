@@ -8,7 +8,7 @@ declare(strict_types=1);
  * Jalankan: php backend/tests/AuthTest.php
  */
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require dirname(__DIR__) . '/src/Auth.php';
 
 use Bogana\Auth;
 
