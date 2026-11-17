@@ -94,6 +94,15 @@ final class Auth
     }
 
     /**
+     * Aksi POST yang aman dijalankan pada mode demo karena tidak menulis
+     * ke database: urai pesanan (cache Redis) dan cek kecukupan stok.
+     */
+    public static function demoAllowsAction(string $page, string $action): bool
+    {
+        return $page === 'orders' && in_array($action, ['parse', 'check'], true);
+    }
+
+    /**
      * Mode `required` tanpa kredensial: konfigurasi tidak lengkap.
      */
     public function misconfigured(): bool

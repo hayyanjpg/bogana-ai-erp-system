@@ -152,11 +152,13 @@ final class Router
 
     private function dispatchPost(string $page): void
     {
-        if ($this->auth->isReadOnly()) {
+        $action = (string) ($_POST['action'] ?? '');
+
+        if ($this->auth->isReadOnly() && !Auth::demoAllowsAction($page, $action)) {
             $this->renderError(
                 403,
-                'Dashboard berjalan dalam mode demo (hanya baca). '
-                . 'Aksi tulis dinonaktifkan; set DASHBOARD_PASSWORD_HASH untuk mengaktifkan mode login.',
+                'Dashboard berjalan dalam mode demo. Hanya urai pesanan dan cek stok yang '
+                . 'tersedia; aksi tulis dinonaktifkan.',
                 'DEMO_READ_ONLY',
             );
 
@@ -172,8 +174,6 @@ final class Router
 
             return;
         }
-
-        $action = (string) ($_POST['action'] ?? '');
 
         match (true) {
             $page === 'orders' && $action === 'parse' => $this->parseOrder(),

@@ -130,7 +130,7 @@ $nav = [
     <?php if ($readOnly ?? false): ?>
       <div data-demo-mode="read-only" class="mx-6 mt-4 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 px-4 py-2 text-[12px] flex items-start gap-2">
         <span class="material-symbols-outlined text-[16px] leading-5">visibility</span>
-        <span><strong>Mode demo (hanya baca).</strong> Data contoh untuk portofolio — semua aksi tulis dinonaktifkan di server.</span>
+        <span><strong>Mode demo (hanya baca).</strong> Data contoh untuk portofolio — aksi tulis dinonaktifkan di server, tetapi <em>urai pesanan</em> dan <em>cek stok</em> tetap bisa dicoba.</span>
       </div>
     <?php endif; ?>
     <div class="w-full px-6 py-6">
@@ -145,7 +145,11 @@ $nav = [
 <script>
 (function(){
   if(document.body.getAttribute('data-read-only')==='1'){
-    document.querySelectorAll('form[method="post"] button[type="submit"]').forEach(function(b){b.disabled=true;b.classList.add('opacity-50','cursor-not-allowed');b.title='Mode demo: hanya baca';});
+    document.querySelectorAll('form[method="post"] button[type="submit"]').forEach(function(b){
+      var f=b.closest('form');
+      if(f&&f.hasAttribute('data-demo-allow'))return;
+      b.disabled=true;b.classList.add('opacity-50','cursor-not-allowed');b.title='Mode demo: hanya baca';
+    });
   }
   var clock=document.querySelector('[data-clock]');
   if(clock){var tick=function(){try{clock.textContent=new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(new Date())+' WIB';}catch(e){}};tick();setInterval(tick,30000);} 
