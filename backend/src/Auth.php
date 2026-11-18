@@ -8,12 +8,11 @@ namespace Bogana;
  * Kontrol akses dashboard ERP.
  *
  * Mode akses (`DASHBOARD_ACCESS_MODE`):
+ * - `open`: publik dan boleh menulis (default bila kredensial kosong).
  * - `required`: wajib login. Butuh `DASHBOARD_PASSWORD_HASH` atau
  *   `DASHBOARD_PASSWORD`. Jika kredensial kosong, dashboard menolak melayani
- *   (fail closed) daripada membiarkan akses tulis terbuka.
- * - `demo`: publik, hanya baca. Semua aksi tulis ditolak di server.
- * - `open`: publik dan boleh menulis. Khusus pengembangan lokal.
- * - `auto` (default): `required` bila kredensial tersedia, jika tidak `demo`.
+ *   (fail closed) daripada mengklaim terlindungi padahal tidak.
+ * - `auto` (default): `required` bila kredensial tersedia, jika tidak `open`.
  *
  * Sesi disimpan sebagai cookie bertanda tangan HMAC, bukan session file,
  * supaya tetap konsisten pada runtime serverless Vercel.
@@ -22,7 +21,6 @@ final class Auth
 {
     public const MODE_AUTO = 'auto';
     public const MODE_REQUIRED = 'required';
-    public const MODE_DEMO = 'demo';
     public const MODE_OPEN = 'open';
 
     private const COOKIE = 'bogana_auth';
@@ -42,7 +40,7 @@ final class Auth
     public static function fromEnv(): self
     {
         $mode = strtolower(trim((string) (getenv('DASHBOARD_ACCESS_MODE') ?: self::MODE_AUTO)));
-        if (!in_array($mode, [self::MODE_AUTO, self::MODE_REQUIRED, self::MODE_DEMO, self::MODE_OPEN], true)) {
+        if (!in_array($mode, [self::MODE_AUTO, self::MODE_REQUIRED, self::MODE_OPEN], true)) {
             $mode = self::MODE_AUTO;
         }
 
@@ -52,7 +50,7 @@ final class Auth
         if ($mode === self::MODE_AUTO) {
             $mode = $passwordHash !== '' || $password !== ''
                 ? self::MODE_REQUIRED
-                : self::MODE_DEMO;
+                : self::MODE_OPEN;
         }
 
         $username = trim((string) (getenv('DASHBOARD_USER') ?: self::DEFAULT_USERNAME));
@@ -88,20 +86,6 @@ final class Auth
         return $this->mode === self::MODE_REQUIRED;
     }
 
-    public function isReadOnly(): bool
-    {
-        return $this->mode === self::MODE_DEMO;
-    }
-
-    /**
-     * Aksi POST yang aman dijalankan pada mode demo karena tidak menulis
-     * ke database: urai pesanan (cache Redis) dan cek kecukupan stok.
-     */
-    public static function demoAllowsAction(string $page, string $action): bool
-    {
-        return $page === 'orders' && in_array($action, ['parse', 'check'], true);
-    }
-
     /**
      * Mode `required` tanpa kredensial: konfigurasi tidak lengkap.
      */
@@ -130,7 +114,7 @@ final class Auth
             return $this->username;
         }
 
-        return $this->isReadOnly() ? 'Mode Demo' : 'Tamu';
+        return $this->requiresLogin() ? 'Tamu' : 'Publik';
     }
 
     public function attempt(string $username, string $password): bool

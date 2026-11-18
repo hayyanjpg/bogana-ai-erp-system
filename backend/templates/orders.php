@@ -87,7 +87,7 @@ $statusPill = static function(string $s): string { $t=status_tone($s); return ma
   <?php if ($saveError !== null): ?><?php $renderError($saveError); ?><?php endif; ?>
 
   <section id="parse" class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start scroll-mt-20">
-    <form method="post" action="?page=orders" class="xl:col-span-5 bg-surface-container-lowest rounded-xl p-5 shadow-xs border border-outline-variant/20 space-y-4" data-demo-allow data-submit-lock>
+    <form method="post" action="?page=orders" class="xl:col-span-5 bg-surface-container-lowest rounded-xl p-5 shadow-xs border border-outline-variant/20 space-y-4" data-submit-lock>
       <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
       <input type="hidden" name="action" value="parse">
       <div class="flex items-center justify-between pb-1"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary"><span class="material-symbols-outlined text-[18px]">edit_note</span></div><div><h2 class="font-headline text-[15px] font-semibold">Input Teks Pesanan</h2><p class="text-[12px] text-on-surface-variant">Tempel teks dari WhatsApp/Email/Telepon</p></div></div></div>
@@ -181,7 +181,7 @@ $statusPill = static function(string $s): string { $t=status_tone($s); return ma
       <?php if ($checkResult !== null): $sufficient = (bool)($checkResult['sufficient'] ?? false); ?>
         <div class="mb-3 p-3 rounded-lg <?= $sufficient?'bg-emerald-50 border border-emerald-200 text-emerald-900':'bg-error-container/40 border border-error/30 text-on-error-container' ?>"><p class="text-[13px] font-semibold"><?= $sufficient?'Stok mencukupi':'Stok belum mencukupi' ?></p><p class="text-[11px] mt-0.5 font-mono"><?= e($checkResult['order_code']??'-') ?> · <?= e(count($checkInsufficient)) ?> kurang</p></div>
       <?php endif; ?>
-      <form method="post" action="?page=orders&focus=check#allocate" data-demo-allow data-submit-lock class="flex items-end gap-2">
+      <form method="post" action="?page=orders&focus=check#allocate" data-submit-lock class="flex items-end gap-2">
         <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="check">
         <label class="flex-1 flex flex-col gap-1"><span class="text-[12px] font-medium text-on-surface">Order ID</span><input class="h-9 px-3 rounded-lg bg-surface-container-low/60 border border-outline-variant/40 text-[13px]" type="number" name="order_id" min="1" required value="<?= e($orderIdValue) ?>"></label>
         <button class="h-9 px-4 rounded-lg bg-primary text-on-primary text-[13px] font-medium" type="submit">Cek Stok</button>

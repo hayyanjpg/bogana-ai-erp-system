@@ -26,7 +26,7 @@ final class Router
                 $this->renderError(
                     503,
                     'Dashboard belum dikonfigurasi: isi DASHBOARD_PASSWORD_HASH '
-                    . 'atau DASHBOARD_PASSWORD, atau set DASHBOARD_ACCESS_MODE=demo.',
+                    . 'atau DASHBOARD_PASSWORD, atau set DASHBOARD_ACCESS_MODE=open.',
                     'DASHBOARD_NOT_CONFIGURED',
                 );
 
@@ -153,17 +153,6 @@ final class Router
     private function dispatchPost(string $page): void
     {
         $action = (string) ($_POST['action'] ?? '');
-
-        if ($this->auth->isReadOnly() && !Auth::demoAllowsAction($page, $action)) {
-            $this->renderError(
-                403,
-                'Dashboard berjalan dalam mode demo. Hanya urai pesanan dan cek stok yang '
-                . 'tersedia; aksi tulis dinonaktifkan.',
-                'DEMO_READ_ONLY',
-            );
-
-            return;
-        }
 
         if (!csrf_valid()) {
             $this->renderError(

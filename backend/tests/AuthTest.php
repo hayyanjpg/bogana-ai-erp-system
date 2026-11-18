@@ -70,30 +70,28 @@ $hash = password_hash('rahasia-sekali', PASSWORD_DEFAULT);
 
 // --- Mode akses -----------------------------------------------------------
 
-withEnv([], function () use ($hash): void {
+withEnv([], function (): void {
     $auth = Auth::fromEnv();
-    check('auto tanpa kredensial menjadi demo', $auth->mode() === Auth::MODE_DEMO);
-    check('demo bersifat hanya baca', $auth->isReadOnly());
-    check('demo tidak meminta login', !$auth->requiresLogin());
-    check('demo bukan misconfigured', !$auth->misconfigured());
-    check('demo menampilkan nama mode', $auth->displayName() === 'Mode Demo');
+    check('auto tanpa kredensial menjadi open', $auth->mode() === Auth::MODE_OPEN);
+    check('open tidak meminta login', !$auth->requiresLogin());
+    check('open bukan misconfigured', !$auth->misconfigured());
+    check('open menampilkan nama publik', $auth->displayName() === 'Publik');
 });
 
 withEnv(['DASHBOARD_PASSWORD_HASH' => $hash], function (): void {
     $auth = Auth::fromEnv();
     check('auto dengan hash menjadi required', $auth->mode() === Auth::MODE_REQUIRED);
-    check('required tidak hanya baca', !$auth->isReadOnly());
     check('required bukan misconfigured', !$auth->misconfigured());
 });
 
-withEnv(['DASHBOARD_ACCESS_MODE' => 'demo', 'DASHBOARD_PASSWORD_HASH' => $hash], function (): void {
-    check('mode demo eksplisit menang atas kredensial', Auth::fromEnv()->mode() === Auth::MODE_DEMO);
+withEnv(['DASHBOARD_ACCESS_MODE' => 'open', 'DASHBOARD_PASSWORD_HASH' => $hash], function (): void {
+    check('mode open eksplisit menang atas kredensial', Auth::fromEnv()->mode() === Auth::MODE_OPEN);
 });
 
 withEnv(['DASHBOARD_ACCESS_MODE' => 'open'], function (): void {
     $auth = Auth::fromEnv();
     check('mode open tidak meminta login', !$auth->requiresLogin());
-    check('mode open tidak hanya baca', !$auth->isReadOnly());
+    check('mode open bukan misconfigured', !$auth->misconfigured());
 });
 
 withEnv(['DASHBOARD_ACCESS_MODE' => 'required'], function (): void {
@@ -101,17 +99,8 @@ withEnv(['DASHBOARD_ACCESS_MODE' => 'required'], function (): void {
 });
 
 withEnv(['DASHBOARD_ACCESS_MODE' => 'ngawur'], function (): void {
-    check('mode tidak dikenal jatuh ke auto', Auth::fromEnv()->mode() === Auth::MODE_DEMO);
+    check('mode tidak dikenal jatuh ke auto', Auth::fromEnv()->mode() === Auth::MODE_OPEN);
 });
-
-// --- Aksi yang tetap aman pada mode demo ----------------------------------
-
-check('demo mengizinkan urai pesanan', Auth::demoAllowsAction('orders', 'parse'));
-check('demo mengizinkan cek stok', Auth::demoAllowsAction('orders', 'check'));
-check('demo menolak simpan order', !Auth::demoAllowsAction('orders', 'save'));
-check('demo menolak QC', !Auth::demoAllowsAction('orders', 'qc'));
-check('demo menolak alokasi', !Auth::demoAllowsAction('orders', 'allocate'));
-check('demo menolak restock', !Auth::demoAllowsAction('stocks', 'restock'));
 
 // --- Verifikasi kredensial ------------------------------------------------
 
