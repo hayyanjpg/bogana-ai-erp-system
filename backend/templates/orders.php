@@ -7,6 +7,8 @@
 /** @var array<string, mixed>|null $checkError */
 /** @var array<string, mixed>|null $confirmResult */
 /** @var array<string, mixed>|null $confirmError */
+/** @var array<string, mixed>|null $cancelResult */
+/** @var array<string, mixed>|null $cancelError */
 /** @var array<string, mixed>|null $qcResult */
 /** @var array<string, mixed>|null $qcError */
 /** @var array<string, mixed>|null $allocateResult */
@@ -25,6 +27,8 @@ $checkResult = is_array($checkResult ?? null) ? $checkResult : null;
 $checkError = is_array($checkError ?? null) ? $checkError : null;
 $confirmResult = is_array($confirmResult ?? null) ? $confirmResult : null;
 $confirmError = is_array($confirmError ?? null) ? $confirmError : null;
+$cancelResult = is_array($cancelResult ?? null) ? $cancelResult : null;
+$cancelError = is_array($cancelError ?? null) ? $cancelError : null;
 $qcResult = is_array($qcResult ?? null) ? $qcResult : null;
 $qcError = is_array($qcError ?? null) ? $qcError : null;
 $allocateResult = is_array($allocateResult ?? null) ? $allocateResult : null;
@@ -55,6 +59,8 @@ $listItems = is_array($ordersList['items'] ?? null) ? $ordersList['items'] : [];
 $detailItems = $orderDetail !== null && is_array($orderDetail['items'] ?? null) ? $orderDetail['items'] : [];
 $detailReqs = $orderDetail !== null && is_array($orderDetail['requirements'] ?? null) ? $orderDetail['requirements'] : [];
 $detailIns = $orderDetail !== null && is_array($orderDetail['insufficient'] ?? null) ? $orderDetail['insufficient'] : [];
+$detailStatusValue = $orderDetail !== null ? (string) ($orderDetail['status'] ?? '') : '';
+$canCancel = $orderDetail !== null && !in_array($detailStatusValue, ['fulfilled', 'cancelled'], true);
 $renderError = static function (array $error): void {
   $status = (int)($error['status'] ?? 0);
   $details = is_array($error['details'] ?? null) ? $error['details'] : [];
@@ -152,6 +158,8 @@ $statusPill = static function(string $s): string { $t=status_tone($s); return ma
     <div class="xl:col-span-7 space-y-4">
       <?php if ($confirmResult !== null): ?><div class="rounded-lg border <?= ($confirmResult['status']??'')==='confirmed'?'border-emerald-200 bg-emerald-50 text-emerald-900':'border-amber-200 bg-amber-50 text-amber-900' ?> p-3"><p class="text-[13px] font-semibold">Konfirmasi: status <?= e(status_label((string)($confirmResult['status']??''))) ?> (v<?= e($confirmResult['version']??'-') ?>)</p><?php if(!empty($confirmResult['insufficient'])): ?><p class="text-[12px] mt-0.5">Stok kurang pada beberapa bahan — restock lalu konfirmasi ulang.</p><?php endif; ?></div><?php endif; ?>
       <?php if ($confirmError !== null): ?><?php $renderError($confirmError); ?><?php endif; ?>
+      <?php if ($cancelResult !== null): ?><div class="rounded-lg border border-slate-200 bg-surface-container-low p-3 text-on-surface"><p class="text-[13px] font-semibold">Order <?= e($cancelResult['order_code'] ?? '-') ?> dibatalkan (v<?= e($cancelResult['version'] ?? '-') ?>)</p><p class="text-[12px] mt-0.5">Stok tidak berubah karena pembatalan hanya berlaku sebelum alokasi.</p></div><?php endif; ?>
+      <?php if ($cancelError !== null): ?><?php $renderError($cancelError); ?><?php endif; ?>
       <?php if ($qcResult !== null): ?><div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-900"><p class="text-[13px] font-semibold">QC pass tercatat untuk item #<?= e($qcResult['order_item_id']??'-') ?> (<?= e($qcResult['recorded']??0) ?> log bahan)</p></div><?php endif; ?>
       <?php if ($qcError !== null): ?><?php $renderError($qcError); ?><?php endif; ?>
 
@@ -161,6 +169,9 @@ $statusPill = static function(string $s): string { $t=status_tone($s); return ma
             <div><div class="flex items-center gap-2"><h2 class="font-headline text-[16px] font-semibold"><?= e($orderDetail['order_code'] ?? '-') ?></h2><span class="px-2 py-0.5 rounded-full text-[11px] font-semibold <?= $statusPill((string)($orderDetail['status']??'')) ?>"><?= e(status_label((string)($orderDetail['status']??''))) ?></span></div><div class="text-[12px] text-on-surface-variant mt-0.5">ID #<?= e($orderDetail['id']??'-') ?> · <?= e($orderDetail['customer_name']??'-') ?> · v<?= e($orderDetail['version']??'-') ?> · <?= e(format_date_id((string)($orderDetail['order_date']??''), true)) ?></div></div>
             <div class="flex gap-2">
               <form method="post" action="?page=orders&order_id=<?= e($orderDetail['id']??'') ?>&focus=confirm#order-detail" data-submit-lock><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="confirm"><input type="hidden" name="order_id" value="<?= e($orderDetail['id']??'') ?>"><button class="h-9 px-3 rounded-lg bg-surface-container hover:bg-surface-container-high text-[13px] font-medium" type="submit">Cek & Konfirmasi</button></form>
+              <?php if ($canCancel): ?>
+                <form method="post" action="?page=orders&order_id=<?= e($orderDetail['id']??'') ?>&focus=cancel#order-detail" data-submit-lock onsubmit="return confirm('Batalkan order ini? Status berubah menjadi cancelled dan tidak bisa dikembalikan.');"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="cancel"><input type="hidden" name="order_id" value="<?= e($orderDetail['id']??'') ?>"><button class="h-9 px-3 rounded-lg bg-error-container text-error hover:opacity-90 text-[13px] font-medium" type="submit">Batalkan</button></form>
+              <?php endif; ?>
             </div>
           </div>
           <div class="overflow-x-auto rounded-lg border border-outline-variant/20"><table class="w-full text-left"><thead><tr class="bg-surface-container-low text-on-surface-variant text-[11px] uppercase"><th class="px-3 py-2">Item</th><th class="px-3 py-2 text-center">Qty</th><th class="px-3 py-2 text-right">Total</th><th class="px-3 py-2 text-center">QC</th><th class="px-3 py-2">Aksi QC</th></tr></thead><tbody class="text-[13px] divide-y divide-surface-container-low"><?php foreach($detailItems as $it): ?><tr><td class="px-3 py-2.5"><div class="font-medium"><?= e($it['menu_name']??'-') ?></div><div class="text-[11px] font-mono text-on-surface-variant"><?= e($it['menu_sku']??'-') ?> · item #<?= e($it['id']??'-') ?></div></td><td class="px-3 py-2.5 text-center tabular"><?= e(format_quantity((float)($it['quantity']??0))) ?></td><td class="px-3 py-2.5 text-right tabular">Rp <?= e(format_number((float)($it['line_total']??0))) ?></td><td class="px-3 py-2.5 text-center"><?php if(!empty($it['qc_passed'])): ?><span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">Pass</span><?php else: ?><span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold">Belum</span><?php endif; ?></td><td class="px-3 py-2.5"><?php if(empty($it['qc_passed'])): ?><form method="post" action="?page=orders&order_id=<?= e($orderDetail['id']??'') ?>&focus=qc#order-detail" data-submit-lock class="flex items-center gap-1.5"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="qc"><input type="hidden" name="order_id" value="<?= e($orderDetail['id']??'') ?>"><input type="hidden" name="item_id" value="<?= e($it['id']??'') ?>"><input type="hidden" name="checked_by" value="admin"><button class="px-2.5 py-1 rounded bg-primary/10 text-primary text-[12px] font-medium" type="submit">Catat Pass</button></form><?php else: ?><span class="text-[12px] text-on-surface-variant">—</span><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div>

@@ -200,6 +200,8 @@ class FakeOrderRepository:
         self.orders = []
         self.confirm_result = None
         self.confirm_calls: list[int] = []
+        self.cancel_result = None
+        self.cancel_calls: list[int] = []
         self.qc_result = None
         self.qc_calls = []
 
@@ -237,6 +239,12 @@ class FakeOrderRepository:
         if self.confirm_result is None:
             raise AssertionError("confirm_result belum disiapkan pada fake repository")
         return self.confirm_result
+
+    async def cancel(self, order_id: int):
+        self.cancel_calls.append(order_id)
+        if self.cancel_result is None:
+            raise AssertionError("cancel_result belum disiapkan pada fake repository")
+        return self.cancel_result
 
     async def record_qc_pass(self, order_id: int, item_id: int, checked_by: str, note):
         self.qc_calls.append((order_id, item_id, checked_by, note))

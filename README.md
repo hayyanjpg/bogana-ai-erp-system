@@ -46,6 +46,7 @@ Proyek ini dibangun sebagai portofolio end-to-end untuk posisi **AI Engineer**
 | Cache Redis | Snapshot stok (60 s), hasil parse (15 menit), agregat dashboard (30 s), fail-open bila Redis mati. |
 | Dashboard PHP | Ringkasan order, stok menipis, order `short`, menu terlaris, forecast, status sistem. |
 | Workbench order | Halaman **Order & parser**: urai teks order, cek kecukupan stok, dan alokasi stok langsung dari UI. |
+| Pembatalan order | Batalkan order sebelum `fulfilled`; status menjadi `cancelled` dan item non-fulfilled ikut dibatalkan tanpa mengubah stok. |
 | Detail stok | Panel detail per SKU berisi stok, reorder point, harga satuan, dan menu yang memakai bahan tersebut. |
 | Demand forecast | Prakiraan permintaan per menu dengan `confidence` dan `model_version`. |
 | CI/CD | GitHub Actions: `php -l`, `ruff`, `pytest` pada setiap PR ke `main`. |
@@ -200,11 +201,22 @@ Akses:
 | Health check | http://localhost:8000/health |
 
 `database/schema.sql` otomatis dijalankan saat volume PostgreSQL pertama kali
-dibuat (mount ke `/docker-entrypoint-initdb.d`). Untuk menjalankan ulang seed:
+dibuat (mount ke `/docker-entrypoint-initdb.d`). Seed memakai tanggal relatif
+(`CURRENT_DATE`), jadi dashboard dan forecast selalu berisi data pada hari
+database di-reset.
+
+Untuk mengembalikan data demo (semua tabel dihapus lalu diisi ulang):
 
 ```bash
+# lokal via Docker
 docker compose exec -T db psql -U postgres -d bogana -f - < database/schema.sql
+
+# lokal/Neon via script (butuh DATABASE_URL)
+DATABASE_URL=postgresql://user:password@host/bogana python scripts/reset_demo.py --yes
 ```
+
+> Script reset bersifat destruktif. Jangan arahkan `DATABASE_URL` ke database
+> berisi data nyata.
 
 > Kredensial pada `.env.example` hanya untuk development. Jangan dipakai di
 > production.

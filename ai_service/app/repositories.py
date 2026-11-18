@@ -4,6 +4,7 @@ import asyncpg
 
 from app.domain import (
     AllocationResult,
+    CancelResult,
     ConfirmResult,
     DashboardData,
     ForecastRow,
@@ -447,6 +448,40 @@ class _OrderExtMixin:
                 requirements,
             )
 
+    async def cancel(self, order_id):
+        pool = self._require_pool()
+        async with pool.acquire() as conn, conn.transaction():
+            header = await conn.fetchrow(
+                "SELECT id, order_code, status FROM b2b_orders WHERE id=$1 FOR UPDATE",
+                order_id,
+            )
+            if header is None:
+                raise NotFoundError(f"Order {order_id} tidak ditemukan")
+            if header["status"] == "fulfilled":
+                raise ConflictError(
+                    f"Order {header['order_code']} sudah fulfilled, stok sudah dipotong"
+                )
+            if header["status"] == "cancelled":
+                raise ConflictError(f"Order {header['order_code']} sudah dibatalkan")
+
+            row = await conn.fetchrow(
+                "UPDATE b2b_orders SET status='cancelled', version=version+1, "
+                "updated_at=now() WHERE id=$1 RETURNING status, version, updated_at",
+                order_id,
+            )
+            await conn.execute(
+                "UPDATE order_items SET status='cancelled' "
+                "WHERE order_id=$1 AND status <> 'fulfilled'",
+                order_id,
+            )
+            return CancelResult(
+                header["id"],
+                header["order_code"],
+                row["status"],
+                int(row["version"]),
+                row["updated_at"],
+            )
+
     async def record_qc_pass(self, order_id, item_id, checked_by, note):
         pool = self._require_pool()
         async with pool.acquire() as conn, conn.transaction():
@@ -482,7 +517,14 @@ class _OrderExtMixin:
 
 
 # bind mixin methods onto OrderRepository
-for _name in ("save_from_parse", "list_orders", "get_detail", "confirm_or_short", "record_qc_pass"):
+for _name in (
+    "save_from_parse",
+    "list_orders",
+    "get_detail",
+    "confirm_or_short",
+    "cancel",
+    "record_qc_pass",
+):
     setattr(OrderRepository, _name, getattr(_OrderExtMixin, _name))
 
 

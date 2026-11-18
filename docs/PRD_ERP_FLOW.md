@@ -81,6 +81,7 @@ Masalah yang diselesaikan sistem:
 - Jika `short`: tambah stok via `POST /v1/stocks/{sku}/restock` (stok tidak boleh negatif), lalu `confirm` ulang hingga `confirmed`.
 - QC: `POST /v1/orders/{id}/items/{item_id}/qc` mencatat `qc_logs` `pass` per bahan resep item. Seluruh item wajib punya QC pass sebelum alokasi.
 - `POST /v1/orders/{id}/allocate`: transaksi atomik, syarat `confirmed` + QC pass semua item + stok cukup → potong `ingredients.stock_on_hand`, set `fulfilled`. Stok **tidak boleh** negatif.
+- `POST /v1/orders/{id}/cancel`: membatalkan order sebelum `fulfilled` (status `cancelled`, item non-fulfilled ikut dibatalkan, stok tidak berubah). Order `fulfilled` ditolak karena stok sudah dipotong.
 
 ### 4.3 Cache Redis
 

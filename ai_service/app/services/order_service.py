@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from app.cache import JsonCache
 from app.domain import (
     AllocationResult,
+    CancelResult,
     ConfirmResult,
     OrderDetail,
     OrderSnapshot,
@@ -16,6 +17,7 @@ from app.repositories import OrderRepository
 from app.schemas import (
     AllocateOrderResponse,
     AllocationDeductionItem,
+    CancelOrderResponse,
     CheckStockResponse,
     ConfirmOrderResponse,
     OrderDetailResponse,
@@ -157,6 +159,22 @@ class OrderService:
             version=result.version,
             sufficient=result.status == "confirmed",
             insufficient=insufficient,
+        )
+
+    async def cancel(self, order_id: int) -> CancelOrderResponse:
+        snapshot = await self._require_snapshot(order_id)
+        if snapshot.status in ("fulfilled", "cancelled"):
+            raise ConflictError(f"Order berstatus {snapshot.status} tidak dapat dibatalkan")
+
+        result: CancelResult = await self._repository.cancel(order_id)
+        await self._dashboard_cache.delete("summary")
+
+        return CancelOrderResponse(
+            order_id=result.order_id,
+            order_code=result.order_code,
+            status=result.status,
+            version=result.version,
+            cancelled_at=result.cancelled_at,
         )
 
     async def record_qc_pass(

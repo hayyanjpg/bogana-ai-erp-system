@@ -6,6 +6,7 @@ from app.deps import get_order_service, get_parse_order_service, require_interna
 from app.schemas import (
     AllocateOrderRequest,
     AllocateOrderResponse,
+    CancelOrderResponse,
     CheckStockResponse,
     ConfirmOrderResponse,
     OrderDetailResponse,
@@ -75,6 +76,14 @@ async def confirm_order(
     service: OrderService = Depends(get_order_service),
 ) -> ConfirmOrderResponse:
     return await service.confirm(order_id)
+
+
+@router.post("/orders/{order_id}/cancel", response_model=CancelOrderResponse)
+async def cancel_order(
+    order_id: int,
+    service: OrderService = Depends(get_order_service),
+) -> CancelOrderResponse:
+    return await service.cancel(order_id)
 
 
 @router.post("/orders/{order_id}/items/{item_id}/qc", response_model=RecordQcResponse)

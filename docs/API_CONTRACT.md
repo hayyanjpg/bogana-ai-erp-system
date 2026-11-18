@@ -431,6 +431,31 @@ Menambah `stock_on_hand` (atomik). Menginvalidasi `erp:stock:all`.
 **Request**: `{ "quantity": <number > 0> }`
 **Response 200**: `{ "sku","name","unit","stock_on_hand","status" }`. 404 bila SKU tidak ada.
 
+### 7.10 `POST /v1/orders/{order_id}/cancel`
+
+Membatalkan order sebelum stok dialokasikan. Status header menjadi `cancelled`,
+`version` bertambah 1, dan seluruh `order_items` yang belum `fulfilled` ikut
+menjadi `cancelled`. Stok **tidak** berubah karena belum ada pemotongan.
+
+**Request**: `{}` (tanpa body)
+
+**Response 200**
+```json
+{
+  "order_id": 2,
+  "order_code": "ORD-20261118-002",
+  "status": "cancelled",
+  "version": 2,
+  "cancelled_at": "2026-11-18T09:30:00+07:00"
+}
+```
+
+- Order `fulfilled` -> `409 CONFLICT`; stok sudah dipotong sehingga pembatalan
+  tidak otomatis mengembalikan stok.
+- Order yang sudah `cancelled` -> `409 CONFLICT`.
+- Order tidak ditemukan -> `404 NOT_FOUND`.
+- Cache `erp:dashboard:summary` diinvalidasi setelah pembatalan berhasil.
+
 ---
 
 ## 8. `GET /v1/dashboard/summary`
@@ -536,6 +561,7 @@ Prakiraan permintaan per menu dari `demand_forecasts`.
 | GET | `/v1/orders/{order_id}` | Detail order + kebutuhan/QC | - |
 | POST | `/v1/orders/{order_id}/check-stock` | Cek kecukupan bahan | - |
 | POST | `/v1/orders/{order_id}/confirm` | Hitung & persist status confirmed/short | invalidasi dashboard |
+| POST | `/v1/orders/{order_id}/cancel` | Batalkan order sebelum fulfilled | invalidasi dashboard |
 | POST | `/v1/orders/{order_id}/items/{item_id}/qc` | Catat QC pass item | - |
 | POST | `/v1/orders/{order_id}/allocate` | Alokasi stok (transaksi) | invalidasi stok & dashboard |
 | POST | `/v1/stocks/{sku}/restock` | Tambah stok bahan | invalidasi stok |

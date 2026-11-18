@@ -149,6 +149,15 @@ class ConfirmResult:
 
 
 @dataclass(frozen=True)
+class CancelResult:
+    order_id: int
+    order_code: str
+    status: str
+    version: int
+    cancelled_at: datetime
+
+
+@dataclass(frozen=True)
 class QcRecordResult:
     order_id: int
     order_item_id: int

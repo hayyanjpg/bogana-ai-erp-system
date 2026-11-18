@@ -61,7 +61,8 @@ DASHBOARD_ACCESS_MODE=open
 ```
 
 Konsekuensinya data demo bisa berubah. Pulihkan kondisi awal dengan menjalankan
-ulang `database/schema.sql` (skrip ini men-drop lalu mengisi ulang tabel).
+ulang `database/schema.sql` atau `python scripts/reset_demo.py --yes` (skrip ini
+men-drop lalu mengisi ulang tabel dengan tanggal relatif hari ini).
 
 Pengamanan yang aktif:
 

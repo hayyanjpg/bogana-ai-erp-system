@@ -2,6 +2,7 @@ from datetime import UTC, date, datetime
 
 from app.domain import (
     AllocationResult,
+    CancelResult,
     ConfirmResult,
     OrderDetail,
     OrderItemRow,
@@ -225,6 +226,52 @@ def test_confirm_updates_status(client, order_repo):
     assert body["status"] == "confirmed"
     assert body["sufficient"] is True
     assert order_repo.confirm_calls == [2]
+
+
+def test_cancel_order_marks_cancelled(client, order_repo):
+    order_repo.snapshot = build_snapshot(status="parsed")
+    order_repo.cancel_result = CancelResult(
+        1, "ORD-20261116-002", "cancelled", 2, datetime.now(UTC)
+    )
+
+    response = client.post("/v1/orders/1/cancel")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "cancelled"
+    assert body["version"] == 2
+    assert body["cancelled_at"]
+    assert order_repo.cancel_calls == [1]
+
+
+def test_cancel_rejects_fulfilled_order(client, order_repo):
+    order_repo.snapshot = build_snapshot(status="fulfilled")
+
+    response = client.post("/v1/orders/1/cancel")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "CONFLICT"
+    assert order_repo.cancel_calls == []
+
+
+def test_cancel_rejects_already_cancelled_order(client, order_repo):
+    order_repo.snapshot = build_snapshot(status="cancelled")
+
+    response = client.post("/v1/orders/1/cancel")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "CONFLICT"
+    assert order_repo.cancel_calls == []
+
+
+def test_cancel_unknown_order_returns_404(client, order_repo):
+    order_repo.snapshot = None
+
+    response = client.post("/v1/orders/99/cancel")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+    assert order_repo.cancel_calls == []
 
 
 def test_record_qc_pass(client, order_repo):
