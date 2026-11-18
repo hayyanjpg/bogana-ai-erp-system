@@ -187,10 +187,10 @@ INSERT INTO ingredients (id, sku, name, category, unit, stock_on_hand, reorder_p
     (4,  'ING-BM-01', 'Bawang Merah',           'bumbu',   'kg',     45.000,  10.000, 30000.00, 'Pasar Induk Kramat'),
     (5,  'ING-BP-01', 'Bawang Putih',           'bumbu',   'kg',     30.000,   8.000, 32000.00, 'Pasar Induk Kramat'),
     (6,  'ING-MN-01', 'Minyak Goreng',          'bumbu',   'liter',  90.000,  20.000, 18000.00, 'PT Sari Minyak'),
-    (7,  'ING-TL-01', 'Telur Ayam',             'protein', 'pcs',   720.000, 150.000,  2500.00, 'PT Unggas Jaya'),
+    (7,  'ING-TL-01', 'Telur Ayam',             'protein', 'pcs',    50.000, 150.000,  2500.00, 'PT Unggas Jaya'),
     (8,  'ING-SP-01', 'Sapi Sirloin',           'protein', 'kg',     40.000,  10.000, 120000.00, 'PT Prima Meat'),
-    (9,  'ING-KL-01', 'Kelapa Parut',           'bahan',   'kg',     25.000,   5.000, 25000.00, 'CV Sumber Pangan'),
-    (10, 'ING-SG-01', 'Sagu',                   'bahan',   'kg',     20.000,   4.000, 26000.00, 'CV Sumber Pangan'),
+    (9,  'ING-KL-01', 'Kelapa Parut',           'bahan',   'kg',      4.000,   5.000, 25000.00, 'CV Sumber Pangan'),
+    (10, 'ING-SG-01', 'Sagu',                   'bahan',   'kg',      2.000,   4.000, 26000.00, 'CV Sumber Pangan'),
     (11, 'ING-GR-01', 'Gula Merah',             'bahan',   'kg',     35.000,   8.000, 17000.00, 'CV Sumber Pangan'),
     (12, 'ING-DJ-01', 'Daun Jeruk Purut',       'bumbu',   'kg',      5.000,   1.000, 40000.00, 'Pasar Induk Kramat');
 
@@ -218,16 +218,16 @@ INSERT INTO menu_recipes (menu_id, ingredient_id, quantity) VALUES
     -- Nasi Telur Balado
     (6,  1, 0.125), (6,  7, 2.000), (6,  4, 0.015), (6,  5, 0.010), (6,  6, 0.030), (6,  3, 0.010);
 
--- 7.4 b2b_orders
+-- 7.4 b2b_orders — tanggal relatif agar dashboard hari ini selalu terisi
 INSERT INTO b2b_orders (id, order_code, customer_name, customer_phone, channel, raw_text, status, order_date, notes) VALUES
-    (1, 'ORD-20261115-001', 'Warung Bu Sri',          '081200011001', 'whatsapp',
-     'gan besok pagi 40 nasi bogana komplit sama 15 ayam kecap ya', 'fulfilled', DATE '2026-11-15',
+    (1, 'ORD-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-001', 'Warung Bu Sri',          '081200011001', 'whatsapp',
+     'gan besok pagi 40 nasi bogana komplit sama 15 ayam kecap ya', 'fulfilled', CURRENT_DATE,
      'Diantar maksimal jam 06.30'),
-    (2, 'ORD-20261115-002', 'Katering Dapur Ibu Hana', '081200011002', 'email',
-     '30 nasi telur balado 20 klepon untuk acara syukuran', 'short', DATE '2026-11-15',
+    (2, 'ORD-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-002', 'Katering Dapur Ibu Hana', '081200011002', 'email',
+     '30 nasi telur balado 20 klepon untuk acara syukuran', 'short', CURRENT_DATE,
      'Menunggu restock telur'),
-    (3, 'ORD-20261116-001', 'Restoran Sederhana Pak Joko', '081200011003', 'phone',
-     '25 rendang sapi 10 soto betawi', 'parsed', DATE '2026-11-16',
+    (3, 'ORD-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-003', 'Restoran Sederhana Pak Joko', '081200011003', 'phone',
+     '25 rendang sapi 10 soto betawi', 'confirmed', CURRENT_DATE,
      NULL);
 
 -- 7.5 order_items
@@ -236,29 +236,35 @@ INSERT INTO order_items (order_id, menu_id, quantity, unit_price, status) VALUES
     (1, 2, 15.00, 15000.00, 'fulfilled'),
     (2, 6, 30.00, 13000.00, 'pending'),
     (2, 5, 20.00, 12000.00, 'pending'),
-    (3, 4, 25.00, 30000.00, 'allocated'),
-    (3, 3, 10.00, 22000.00, 'allocated');
+    (3, 4, 25.00, 30000.00, 'pending'),
+    (3, 3, 10.00, 22000.00, 'pending');
 
--- 7.6 qc_logs
+-- 7.6 qc_logs — jam QC relatif terhadap hari ini (WIB)
 INSERT INTO qc_logs (order_item_id, ingredient_id, result, checked_by, note, checked_at) VALUES
-    (1,  1, 'pass', 'Siti Aminah', 'Beras kering, tidak lembap',      TIMESTAMPTZ '2026-11-15 04:10:00+07'),
-    (1,  2, 'pass', 'Siti Aminah', 'Ayam segar, suhu 4 C',            TIMESTAMPTZ '2026-11-15 04:18:00+07'),
-    (1,  7, 'pass', 'Siti Aminah', 'Telur utuh, tidak retak',         TIMESTAMPTZ '2026-11-15 04:25:00+07'),
-    (2,  2, 'pass', 'Dewi Lestari', 'Ayam sesuai standar',            TIMESTAMPTZ '2026-11-15 04:30:00+07'),
-    (2,  6, 'pass', 'Dewi Lestari', 'Kemasan minyak baik',            TIMESTAMPTZ '2026-11-15 04:35:00+07'),
-    (3,  4, 'pass', 'Dewi Lestari', 'Bawang merah kering',            TIMESTAMPTZ '2026-11-16 04:12:00+07'),
-    (3,  5, 'hold', 'Dewi Lestari', 'Menunggu cek ulang kadar air',   TIMESTAMPTZ '2026-11-16 04:15:00+07');
+    (1,  1, 'pass', 'Siti Aminah', 'Beras kering, tidak lembap',      (CURRENT_DATE + TIME '04:10') AT TIME ZONE 'Asia/Jakarta'),
+    (1,  2, 'pass', 'Siti Aminah', 'Ayam segar, suhu 4 C',            (CURRENT_DATE + TIME '04:18') AT TIME ZONE 'Asia/Jakarta'),
+    (1,  7, 'pass', 'Siti Aminah', 'Telur utuh, tidak retak',         (CURRENT_DATE + TIME '04:25') AT TIME ZONE 'Asia/Jakarta'),
+    (2,  2, 'pass', 'Dewi Lestari', 'Ayam sesuai standar',            (CURRENT_DATE + TIME '04:30') AT TIME ZONE 'Asia/Jakarta'),
+    (2,  6, 'pass', 'Dewi Lestari', 'Kemasan minyak baik',            (CURRENT_DATE + TIME '04:35') AT TIME ZONE 'Asia/Jakarta'),
+    (3,  4, 'pass', 'Dewi Lestari', 'Bawang merah kering',            (CURRENT_DATE + TIME '05:12') AT TIME ZONE 'Asia/Jakarta'),
+    (3,  5, 'hold', 'Dewi Lestari', 'Menunggu cek ulang kadar air',   (CURRENT_DATE + TIME '05:15') AT TIME ZONE 'Asia/Jakarta');
 
--- 7.7 demand_forecasts
-INSERT INTO demand_forecasts (menu_id, forecast_date, forecast_qty, confidence, model_version) VALUES
-    (1, DATE '2026-11-16', 46.00, 0.820, 'bogana-forecast-v1'),
-    (2, DATE '2026-11-16', 38.00, 0.760, 'bogana-forecast-v1'),
-    (3, DATE '2026-11-16', 16.00, 0.610, 'bogana-forecast-v1'),
-    (4, DATE '2026-11-16', 22.00, 0.700, 'bogana-forecast-v1'),
-    (5, DATE '2026-11-16', 30.00, 0.540, 'bogana-forecast-v1'),
-    (6, DATE '2026-11-16', 27.00, 0.730, 'bogana-forecast-v1'),
-    (1, DATE '2026-11-17', 52.00, 0.850, 'bogana-forecast-v1'),
-    (2, DATE '2026-11-17', 41.00, 0.780, 'bogana-forecast-v1');
+-- 7.7 demand_forecasts — 7 hari ke depan agar halaman forecast tidak kosong
+INSERT INTO demand_forecasts (menu_id, forecast_date, forecast_qty, confidence, model_version)
+SELECT seed.menu_id,
+       CURRENT_DATE + seed_day.day_offset,
+       ROUND(seed.base_qty + ((seed_day.day_offset * 7) % 11) - 3, 2),
+       seed.confidence,
+       'bogana-forecast-v1'
+FROM (VALUES
+    (1, 46.00, 0.820),
+    (2, 38.00, 0.760),
+    (3, 16.00, 0.610),
+    (4, 22.00, 0.700),
+    (5, 30.00, 0.540),
+    (6, 27.00, 0.730)
+) AS seed(menu_id, base_qty, confidence)
+CROSS JOIN generate_series(0, 6) AS seed_day(day_offset);
 
 -- -----------------------------------------------------------------------------
 -- Sinkronkan sequence setelah insert id eksplisit
