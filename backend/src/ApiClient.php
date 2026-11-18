@@ -55,6 +55,10 @@ final class ApiClient
         }
 
         $headers = ['Accept: application/json'];
+        $clientIp = ClientIp::resolve($_SERVER);
+        if ($clientIp !== '') {
+            $headers[] = 'X-Client-IP: ' . $clientIp;
+        }
         if (!$this->config->authDisabled()) {
             $headers[] = 'X-Internal-Token: ' . $this->config->aiServiceToken();
         }

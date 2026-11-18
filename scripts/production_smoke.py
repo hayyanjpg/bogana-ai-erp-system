@@ -1,7 +1,9 @@
 """Smoke test production untuk dashboard PHP dan AI service FastAPI.
 
-Default bersifat read-only. Uji restock hanya berjalan bila SMOKE_ALLOW_WRITE=1
-dan memakai kuantitas kecil pada SKU yang ditentukan.
+Dashboard berjalan publik penuh; skrip tetap tidak menulis kecuali
+SMOKE_ALLOW_WRITE=1. Uji restock memakai kuantitas kecil pada SKU yang
+ditentukan. AI service membatasi laju per IP (429 RATE_LIMITED), jadi jangan
+menjalankan skrip ini berulang kali dalam satu menit.
 
 Environment:
     SMOKE_WEB_URL     URL dashboard PHP (wajib)
@@ -68,10 +70,6 @@ def text_only(html: str) -> str:
     html = re.sub(r"<style.*?</style>", " ", html, flags=re.DOTALL)
     text = re.sub(r"<[^>]+>", " ", html)
     return re.sub(r"\s+", " ", text).replace("&amp;", "&")
-
-
-def is_read_only(html: str) -> bool:
-    return 'data-demo-mode="read-only"' in html
 
 
 def csrf_token(html: str) -> str:
@@ -173,7 +171,7 @@ def check_web(
     web: str,
     username: str,
     password: str,
-) -> tuple[bool, bool]:
+) -> bool:
     _, body, _ = fetch(opener, web + "/")
     requires_login = is_login_page(body)
     authenticated = not requires_login
@@ -202,11 +200,8 @@ def check_web(
         "Forecasts": web + "/?page=forecasts",
         "Health": web + "/?page=health",
     }
-    read_only = False
     for label, url in pages.items():
         status, body, _ = fetch(opener, url)
-        if label == "Dashboard":
-            read_only = is_read_only(body)
         if requires_login and not authenticated:
             record(results, f"Halaman {label}", None, "butuh login dashboard")
             continue
@@ -245,21 +240,18 @@ def check_web(
             if authenticated
             else "login aktif, belum terautentikasi"
         )
-    elif read_only:
-        mode_detail = "demo (hanya baca)"
     else:
-        mode_detail = "akses tulis terbuka"
+        mode_detail = "akses publik penuh"
 
     record(results, "Mode dashboard", True, mode_detail)
 
-    return read_only, authenticated
+    return authenticated
 
 
 def check_php_flows(
     results: Results,
     opener: urllib.request.OpenerDirector,
     web: str,
-    read_only: bool,
     authenticated: bool,
 ) -> None:
     if not authenticated:
@@ -313,16 +305,6 @@ def check_php_flows(
         f"status={status}",
     )
 
-    if read_only:
-        record(
-            results,
-            "Validasi QC (checked_by terlalu panjang)",
-            None,
-            "dashboard mode demo (hanya baca)",
-        )
-
-        return
-
     status, body, _ = fetch(opener, web + "/?page=orders")
     token = csrf_token(body)
     if token:
@@ -354,7 +336,6 @@ def check_restock(
     web: str,
     sku: str,
     quantity: str,
-    read_only: bool,
     authenticated: bool,
 ) -> None:
     if not authenticated:
@@ -363,15 +344,6 @@ def check_restock(
             f"POST restock {sku} qty={quantity}",
             None,
             "butuh login dashboard",
-        )
-        return
-
-    if read_only:
-        record(
-            results,
-            f"POST restock {sku} qty={quantity}",
-            None,
-            "dashboard mode demo (hanya baca)",
         )
         return
 
@@ -448,9 +420,7 @@ def main() -> int:
 
     results: Results = []
     check_api(results, opener, api)
-    read_only, authenticated = check_web(
-        results, opener, web, dashboard_user, dashboard_password
-    )
+    authenticated = check_web(results, opener, web, dashboard_user, dashboard_password)
 
     if token:
         status, body, _ = fetch(
@@ -483,10 +453,10 @@ def main() -> int:
             results, "POST /v1/parse-order langsung", None, "SMOKE_TOKEN tidak diisi"
         )
 
-    check_php_flows(results, opener, web, read_only, authenticated)
+    check_php_flows(results, opener, web, authenticated)
 
     if allow_write:
-        check_restock(results, opener, web, sku, quantity, read_only, authenticated)
+        check_restock(results, opener, web, sku, quantity, authenticated)
     else:
         record(results, "Restock (write)", None, "SMOKE_ALLOW_WRITE tidak diaktifkan")
 

@@ -13,6 +13,7 @@ from app.cache import create_redis_client
 from app.config import get_settings
 from app.db import close_pool, create_pool
 from app.errors import AppError
+from app.ratelimit import RateLimiter, install_rate_limit
 from app.routers import dashboard, forecasts, health, orders, stocks
 
 logger = logging.getLogger("bogana.ai_service")
@@ -50,11 +51,59 @@ VALIDATION_ERROR_RESPONSE: dict[str, Any] = {
 }
 
 
+RATE_LIMITED_RESPONSE: dict[str, Any] = {
+    "description": "Melebihi batas laju permintaan per IP",
+    "headers": {
+        "Retry-After": {
+            "description": "Detik sampai kuota tersedia kembali",
+            "schema": {"type": "integer"},
+        },
+        "X-RateLimit-Limit": {
+            "description": "Kuota maksimum pada jendela waktu berjalan",
+            "schema": {"type": "integer"},
+        },
+        "X-RateLimit-Remaining": {
+            "description": "Sisa kuota pada jendela waktu berjalan",
+            "schema": {"type": "integer"},
+        },
+    },
+    "content": {
+        "application/json": {
+            "schema": {
+                "type": "object",
+                "required": ["error"],
+                "properties": {
+                    "error": {
+                        "type": "object",
+                        "required": ["code", "message"],
+                        "properties": {
+                            "code": {"type": "string", "example": "RATE_LIMITED"},
+                            "message": {"type": "string"},
+                            "details": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field": {"type": "string"},
+                                        "issue": {"type": "string"},
+                                    },
+                                },
+                            },
+                        },
+                    }
+                },
+            }
+        }
+    },
+}
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     app.state.pool = None
     app.state.redis = None
+    app.state.rate_limiter = None
 
     try:
         app.state.pool = await create_pool(settings.database_url)
@@ -69,6 +118,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception:
         logger.exception("Gagal menghubungkan Redis")
         app.state.redis = None
+
+    if app.state.redis is not None:
+        app.state.rate_limiter = RateLimiter(
+            app.state.redis,
+            window_seconds=settings.rate_limit_window_seconds,
+            read_limit=settings.rate_limit_read_requests,
+            write_limit=settings.rate_limit_write_requests,
+        )
+    elif settings.rate_limit_enabled:
+        logger.warning("Rate limit aktif tetapi Redis tidak tersedia; pembatasan dilewati")
 
     yield
 
@@ -142,6 +201,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RequestValidationError, handle_validation_error)
     app.add_exception_handler(StarletteHTTPException, handle_http_exception)
     app.add_exception_handler(Exception, handle_unexpected_error)
+    install_rate_limit(app)
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema:
@@ -152,15 +212,19 @@ def create_app() -> FastAPI:
             description=app.description,
             routes=app.routes,
         )
-        for path_item in schema.get("paths", {}).values():
+        for path, path_item in schema.get("paths", {}).items():
+            if not path.startswith("/v1/"):
+                continue
             for operation in path_item.values():
                 if not isinstance(operation, dict):
                     continue
                 responses = operation.get("responses")
-                if not isinstance(responses, dict) or "422" not in responses:
+                if not isinstance(responses, dict):
                     continue
-                responses["400"] = VALIDATION_ERROR_RESPONSE
-                del responses["422"]
+                if "422" in responses:
+                    responses["400"] = VALIDATION_ERROR_RESPONSE
+                    del responses["422"]
+                responses["429"] = RATE_LIMITED_RESPONSE
         app.openapi_schema = schema
         return schema
 

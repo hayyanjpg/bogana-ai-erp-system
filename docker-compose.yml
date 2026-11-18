@@ -68,6 +68,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-dev-internal-token}
       AI_SERVICE_AUTH_DISABLED: ${AI_SERVICE_AUTH_DISABLED:-true}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      RATE_LIMIT_READ_REQUESTS: ${RATE_LIMIT_READ_REQUESTS:-120}
+      RATE_LIMIT_WRITE_REQUESTS: ${RATE_LIMIT_WRITE_REQUESTS:-30}
       TZ: ${TZ:-Asia/Jakarta}
     ports:
       - "${AI_SERVICE_PORT:-8000}:8000"
@@ -101,7 +105,8 @@ services:
       AI_SERVICE_URL: http://ai_service:8000
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-dev-internal-token}
       AI_SERVICE_TIMEOUT: ${AI_SERVICE_TIMEOUT:-5}
-      # Lokal: dashboard boleh menulis tanpa login. Production: pakai auto/required.
+      # Lokal: dashboard publik dan boleh menulis. Production: open untuk demo,
+      # atau required + kredensial untuk pemakaian nyata.
       DASHBOARD_ACCESS_MODE: ${DASHBOARD_ACCESS_MODE:-open}
       DASHBOARD_USER: ${DASHBOARD_USER:-admin}
       DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH:-}

@@ -12,7 +12,7 @@ WhatsApp/email diurai menjadi item menu, dicek terhadap stok bahan, melalui QC,
 lalu dialokasikan secara transaksional. Sistem terdiri dari dua service:
 
 - **Dashboard PHP 8.2** (`backend/`) — antarmuka operasional, tanpa framework,
-  dengan CSRF, kontrol akses, dan mode demo.
+  dengan CSRF dan kontrol akses opsional.
 - **AI service FastAPI** (`ai_service/`) — parser teks, aturan stok, QC,
   alokasi, dashboard, dan forecast.
 - **PostgreSQL** sebagai sumber kebenaran, **Redis** untuk cache/idempotensi.
@@ -44,43 +44,44 @@ Keputusan desain yang bisa diceritakan:
 2. **Stok diubah dalam transaksi** (`SELECT ... FOR UPDATE`), bukan update liar.
 3. **Sesi dashboard stateless** — cookie bertanda tangan HMAC, cocok untuk
    serverless yang tidak punya session file bersama.
-4. **Mode demo hanya-baca** — aksi tulis ditolak di server, bukan hanya
-   disembunyikan di UI.
+4. **Rate limit per IP** — demo publik boleh menulis, jadi AI service membatasi
+   laju baca/tulis dan menolak kelebihan dengan `429 RATE_LIMITED`, bukan
+   menonaktifkan fitur.
 
 ---
 
-## 3. Menyiapkan demo publik yang aman
+## 3. Demo publik yang boleh dicoba
 
-Jangan bagikan dashboard yang bisa menulis tanpa login. Pilih salah satu:
-
-### Opsi A — Mode demo (paling aman)
+Dashboard production sengaja berjalan **publik penuh** supaya reviewer bisa
+langsung mencoba alur tulis: simpan order, konfirmasi, QC, alokasi, dan restock.
+Tidak ada mode hanya-baca dan tidak ada kredensial yang perlu dibagikan.
 
 ```env
-DASHBOARD_ACCESS_MODE=demo
+DASHBOARD_ACCESS_MODE=open
 ```
 
-- Semua halaman dapat dibuka publik.
-- **Urai pesanan** dan **cek stok** tetap bisa dicoba karena tidak menulis ke database.
-- Aksi yang mengubah data (simpan order, konfirmasi, QC, alokasi, restock)
-  ditolak dengan `403 DEMO_READ_ONLY`.
-- Banner "Mode demo (hanya baca)" tampil di setiap halaman.
-- Tidak perlu membagikan kredensial ke recruiter.
+Konsekuensinya data demo bisa berubah. Pulihkan kondisi awal dengan menjalankan
+ulang `database/schema.sql` (skrip ini men-drop lalu mengisi ulang tabel).
 
-### Opsi B — Login dengan akun demo
+Pengamanan yang aktif:
+
+- **Rate limit per IP** di AI service: default 120 permintaan baca dan 30 tulis
+  per menit. Kelebihan mendapat `429 RATE_LIMITED` + `Retry-After`.
+- PHP meneruskan IP pengunjung lewat `X-Client-IP`; FastAPI hanya memercayainya
+  bila permintaan membawa token internal yang sah.
+- Penghitung disimpan di Redis sehingga konsisten antar instance serverless.
+- Bila Redis tidak tersedia, pembatasan dilewati (fail open) agar dashboard
+  tetap hidup; kejadian ini dicatat di log.
+- `GET /health` dikecualikan supaya uptime check tidak memakan kuota.
+
+Untuk pemakaian bisnis nyata, aktifkan login:
 
 ```env
 DASHBOARD_ACCESS_MODE=required
-DASHBOARD_USER=demo
+DASHBOARD_USER=admin
 DASHBOARD_PASSWORD_HASH=<hasil password_hash>
 DASHBOARD_SESSION_SECRET=<string acak 32+ karakter>
 ```
-
-Bagikan kredensial demo secara terpisah, dan reset data secara berkala.
-
-### Opsi C — Keduanya
-
-Pakai `required` untuk admin, dan sediakan instance/preview terpisah dengan
-`demo` untuk publik. Ini yang paling mendekati praktik nyata.
 
 ---
 
@@ -96,7 +97,7 @@ Ambil screenshot pada viewport desktop 1440×900 dan mobile 390×844:
 | 4 | Stok bahan | Gauge stok vs reorder point + restock |
 | 5 | Forecast | Proyeksi permintaan + confidence |
 | 6 | Status sistem | `postgres: ok`, `redis: ok` |
-| 7 | Mode demo | Banner hanya-baca (bukti kontrol akses) |
+| 7 | Rate limit | Respons `429 RATE_LIMITED` (opsional, bukti proteksi) |
 
 Simpan di `docs/screenshots/` dengan nama `01-dashboard.png`, dst., lalu
 tambahkan ke `README.md`:
@@ -120,9 +121,11 @@ Video 60–90 detik yang efektif:
   test lama menutupinya karena memakai fake repository. Saya tambahkan
   `_require_pool()`, regression test dengan repository asli, lalu verifikasi
   ulang di production lewat smoke test."
-- **Tentang keamanan:** "Dashboard awalnya publik dan bisa menulis. Saya
-  tambahkan login dengan cookie bertanda tangan, sesi stateless untuk serverless,
-  logout via POST + CSRF, dan mode demo hanya-baca yang ditegakkan di server."
+- **Tentang keamanan:** "Dashboard ini sengaja publik supaya reviewer bisa
+  mencoba alur tulis. Karena itu saya menambahkan rate limit per IP di AI
+  service dengan Redis, meneruskan IP asli dari PHP, dan hanya memercayai
+  header itu bila request membawa token internal. Login berbasis cookie
+  bertanda tangan tetap tersedia untuk pemakaian nyata."
 - **Tentang proses:** "Tidak ada commit langsung ke `main`. Setiap perubahan
   lewat branch, commit kecil, PR, dan CI yang menjalankan lint, test, serta test
   kontrol akses."
@@ -133,7 +136,8 @@ Video 60–90 detik yang efektif:
 
 - Belum ada multi-user dengan role; hanya satu akun operasional.
 - Belum ada audit trail perubahan stok (`stock_movements`).
-- Belum ada rate limiting di AI service.
+- Data demo publik bisa diubah pengunjung; pemulihan masih manual lewat
+  `database/schema.sql`.
 - Belum ada staging terpisah; verifikasi tulis memakai SKU uji di production.
 - Belum ada monitoring/alerting otomatis dan backup terjadwal.
 
@@ -147,8 +151,9 @@ rencana perbaikannya (lihat Roadmap di `README.md`).
 ```text
 ruff check .            → All checks passed
 ruff format --check .   → semua file sesuai
-pytest -q               → 62 passed
-php backend/tests/AuthTest.php → PASS 27 assertion
+pytest -q               → semua lulus (test Redis nyata di-skip bila Redis lokal mati)
+php backend/tests/AuthTest.php     → PASS 25 assertion
+php backend/tests/ClientIpTest.php → PASS 9 assertion
 ```
 
 Smoke test production terakhir:

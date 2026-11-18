@@ -45,7 +45,7 @@ Semua error mengikuti envelope berikut dan **tidak pernah** mengembalikan
 | 404 | `NOT_FOUND` | Order/menu/ingredient tidak ada |
 | 409 | `CONFLICT` | Idempotency key bentrok atau status order tidak mengizinkan aksi |
 | 422 | `BUSINESS_RULE_VIOLATION` | Melanggar aturan bisnis (mis. stok negatif) |
-| 429 | `RATE_LIMITED` | Melebihi batas pemanggilan parser |
+| 429 | `RATE_LIMITED` | Melebihi kuota permintaan per IP (lihat 1.4) |
 | 500 | `INTERNAL_ERROR` | Kesalahan tak terduga |
 | 503 | `DEPENDENCY_UNAVAILABLE` | PostgreSQL/Redis tidak dapat dihubungi |
 
@@ -57,6 +57,22 @@ Semua error mengikuti envelope berikut dan **tidak pernah** mengembalikan
   mengeksekusi ulang. Key sama dengan payload berbeda -> `409 CONFLICT`.
 - Tanpa key, `POST /v1/parse-order` menyimpan cache hasil pada Redis
   `erp:parse:{sha1(raw_text)}` selama 15 menit.
+
+### 1.4 Pembatasan laju (rate limit)
+
+- Setiap IP mendapat kuota terpisah untuk permintaan baca dan tulis per jendela
+  waktu. Default: 120 baca dan 30 tulis per 60 detik.
+- PHP meneruskan IP pengunjung lewat header `X-Client-IP`. FastAPI hanya
+  memercayai header itu bila permintaan membawa `X-Internal-Token` yang sah;
+  selain itu IP socket dipakai, sehingga header tidak bisa dipalsukan untuk
+  menghindari kuota.
+- Respons menyertakan `X-RateLimit-Limit` dan `X-RateLimit-Remaining`.
+- Kuota habis -> `429 RATE_LIMITED` dengan header `Retry-After` (detik).
+- `GET /` dan `GET /health` dikecualikan agar health check tidak terganggu.
+- Bila Redis tidak tersedia, pembatasan dilewati (fail open) dan dicatat di log.
+- Konfigurasi: `RATE_LIMIT_ENABLED`, `RATE_LIMIT_WINDOW_SECONDS`,
+  `RATE_LIMIT_READ_REQUESTS`, `RATE_LIMIT_WRITE_REQUESTS` (nilai `0` mematikan
+  kuota jenis tersebut).
 
 ---
 

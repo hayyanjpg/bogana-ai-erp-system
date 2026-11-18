@@ -12,6 +12,5 @@ Penamaan yang disarankan:
 | `04-stocks.png` | Stok bahan + gauge reorder point |
 | `05-forecasts.png` | Forecast permintaan |
 | `06-health.png` | Status sistem |
-| `07-demo-mode.png` | Banner mode demo hanya-baca |
 
 Panduan lengkap: [`../PORTFOLIO.md`](../PORTFOLIO.md).

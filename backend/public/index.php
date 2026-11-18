@@ -14,7 +14,7 @@ $config = Config::fromEnv();
 $auth = Auth::fromEnv();
 
 $view = new View(dirname(__DIR__) . '/templates', [
-    'readOnly' => $auth->isReadOnly(),
+    'accessMode' => $auth->mode(),
     'currentUser' => $auth->displayName(),
     'canLogout' => $auth->requiresLogin(),
 ]);
