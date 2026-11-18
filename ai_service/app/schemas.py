@@ -189,6 +189,14 @@ class ConfirmOrderResponse(BaseModel):
     insufficient: list[StockRequirementItem]
 
 
+class CancelOrderResponse(BaseModel):
+    order_id: int
+    order_code: str
+    status: str
+    version: int
+    cancelled_at: datetime
+
+
 class RecordQcRequest(BaseModel):
     checked_by: str = Field(min_length=2, max_length=120)
     note: str | None = Field(default=None, max_length=500)

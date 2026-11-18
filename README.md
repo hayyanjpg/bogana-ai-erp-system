@@ -46,6 +46,7 @@ Proyek ini dibangun sebagai portofolio end-to-end untuk posisi **AI Engineer**
 | Cache Redis | Snapshot stok (60 s), hasil parse (15 menit), agregat dashboard (30 s), fail-open bila Redis mati. |
 | Dashboard PHP | Ringkasan order, stok menipis, order `short`, menu terlaris, forecast, status sistem. |
 | Workbench order | Halaman **Order & parser**: urai teks order, cek kecukupan stok, dan alokasi stok langsung dari UI. |
+| Pembatalan order | Batalkan order sebelum `fulfilled`; status menjadi `cancelled` dan item non-fulfilled ikut dibatalkan tanpa mengubah stok. |
 | Detail stok | Panel detail per SKU berisi stok, reorder point, harga satuan, dan menu yang memakai bahan tersebut. |
 | Demand forecast | Prakiraan permintaan per menu dengan `confidence` dan `model_version`. |
 | CI/CD | GitHub Actions: `php -l`, `ruff`, `pytest` pada setiap PR ke `main`. |
