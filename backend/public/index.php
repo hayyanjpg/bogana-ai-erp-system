@@ -10,6 +10,9 @@ use Bogana\View;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
+// Tanggal dashboard dan form order memakai WIB, sama seperti seed database.
+date_default_timezone_set('Asia/Jakarta');
+
 $config = Config::fromEnv();
 $auth = Auth::fromEnv();
 

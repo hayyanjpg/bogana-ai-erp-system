@@ -7,6 +7,10 @@
 
 BEGIN;
 
+-- Seed memakai CURRENT_DATE; kunci ke WIB agar tanggalnya sama dengan
+-- tanggal operasional yang dipakai dashboard PHP.
+SET LOCAL TIME ZONE 'Asia/Jakarta';
+
 DROP TABLE IF EXISTS demand_forecasts;
 DROP TABLE IF EXISTS qc_logs;
 DROP TABLE IF EXISTS order_items;
