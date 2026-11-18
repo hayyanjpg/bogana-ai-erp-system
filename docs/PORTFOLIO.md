@@ -156,10 +156,14 @@ php backend/tests/AuthTest.php     → PASS 25 assertion
 php backend/tests/ClientIpTest.php → PASS 9 assertion
 ```
 
-Smoke test production terakhir:
+Smoke test production terakhir (18 November 2026, akses publik penuh):
 
 ```text
-Total: 19 | PASS: 18 | FAIL: 0 | SKIP: 1
+Total: 20 | PASS: 19 | FAIL: 0 | SKIP: 1
 ```
+
+Bukti rate limit production: 180 permintaan paralel ke `/v1/stocks` ->
+120 diizinkan (`401` karena tanpa token), 60 ditolak `429 RATE_LIMITED`
+dengan `Retry-After: 49` dan `X-RateLimit-Remaining: 0`.
 
 Cara menjalankan ulang: [`docs/PRODUCTION_SMOKE.md`](PRODUCTION_SMOKE.md).
