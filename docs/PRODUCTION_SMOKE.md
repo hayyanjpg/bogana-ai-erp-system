@@ -13,8 +13,8 @@ berjalan bila diaktifkan secara eksplisit.
 - Alur CSRF dashboard untuk parse order dan halaman forecast.
 - Validasi error QC (`checked_by` terlalu panjang) — tidak menulis data.
 - Uji restock opsional dengan kuantitas kecil pada SKU tertentu.
-- Deteksi mode demo: bila dashboard berjalan hanya-baca, pemeriksaan tulis
-  otomatis menjadi `SKIP` (bukan `FAIL`).
+- Bila dashboard berjalan dengan login, halaman terproteksi menjadi `SKIP`
+  tanpa kredensial smoke (bukan `FAIL`).
 
 ## Keamanan
 
@@ -26,10 +26,12 @@ berjalan bila diaktifkan secara eksplisit.
   `SMOKE_QTY` (default `0.01`) pada `SMOKE_SKU` (default `ING-RS-01`).
 - Jangan pernah mengisi `SMOKE_TOKEN` di file yang di-commit.
 
-> Dashboard bisa dikonfigurasi hanya-baca (`DASHBOARD_ACCESS_MODE=demo` atau
-> otomatis saat kredensial belum diisi). Pada mode ini urai pesanan dan cek stok
-> tetap diuji karena tidak menulis data; pemeriksaan QC dan restock otomatis
-> menjadi `SKIP`, sehingga hasil read-only tetap `FAIL: 0`.
+> Dashboard default berjalan **publik penuh**, jadi skrip ini tetap tidak
+> menulis kecuali `SMOKE_ALLOW_WRITE=1`.
+>
+> AI service membatasi laju per IP (default 120 baca / 30 tulis per menit).
+> Jalankan smoke test maksimal sekali per menit; bila muncul `429
+> RATE_LIMITED`, tunggu sesuai header `Retry-After` lalu ulangi.
 >
 > Bila dashboard memakai login (`DASHBOARD_ACCESS_MODE=required`), isi
 > `SMOKE_DASHBOARD_USER` dan `SMOKE_DASHBOARD_PASSWORD`. Tanpa keduanya,
@@ -86,8 +88,9 @@ python scripts/production_smoke.py
 
 ## Checklist setelah deploy
 
-1. Jalankan smoke test read-only.
-2. Jalankan smoke test dengan `SMOKE_ALLOW_WRITE=1` pada SKU uji.
+1. Jalankan smoke test read-only (tanpa `SMOKE_ALLOW_WRITE`).
+2. Jalankan smoke test dengan `SMOKE_ALLOW_WRITE=1` pada SKU uji, setelah
+   menunggu jendela rate limit bila perlu.
 3. Pastikan `/health` menunjukkan `postgres: ok` dan `redis: ok`.
 4. Cek log Vercel untuk error 500 setelah smoke test.
 5. Simpan output smoke test sebagai bukti rilis.

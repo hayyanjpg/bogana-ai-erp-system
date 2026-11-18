@@ -286,16 +286,17 @@ Buka http://127.0.0.1:8080.
 
 ## Akses Dashboard
 
-Dashboard punya empat mode akses (`DASHBOARD_ACCESS_MODE`):
+Dashboard berjalan **publik penuh** secara default supaya reviewer bisa langsung
+mencoba semua fitur: urai pesanan, simpan order, cek stok, konfirmasi, QC,
+alokasi, dan restock.
 
 | Mode | Perilaku | Kapan dipakai |
 | --- | --- | --- |
-| `auto` (default) | Login wajib bila kredensial diisi; jika tidak, hanya-baca | Default aman |
+| `auto` (default) | Login wajib bila kredensial diisi; jika tidak, publik penuh | Default |
+| `open` | Publik dan boleh menulis | Demo portofolio |
 | `required` | Login wajib, aksi tulis aktif | Produksi / internal |
-| `demo` | Publik; urai pesanan & cek stok tetap bisa, aksi tulis ditolak | Portofolio publik |
-| `open` | Publik dan boleh menulis | Lokal saja |
 
-Aktifkan login:
+Aktifkan login (opsional, untuk pemakaian nyata):
 
 ```bash
 php -r "echo password_hash('password-anda', PASSWORD_DEFAULT), PHP_EOL;"
@@ -315,9 +316,11 @@ Sesi disimpan sebagai cookie `HttpOnly` + `SameSite=Lax` yang ditandatangani
 HMAC, sehingga tidak bergantung pada session file dan tetap konsisten di runtime
 serverless. Logout tersedia di sidebar dan selalu memakai `POST` + CSRF.
 
-Tanpa kredensial, dashboard otomatis masuk **mode demo hanya-baca**: production
-tetap hidup dan bisa dinilai, tetapi tidak ada aksi tulis yang dieksekusi.
-Detail keputusan desain dan checklist portofolio: [`docs/PORTFOLIO.md`](docs/PORTFOLIO.md).
+Karena publik bisa menulis, AI service membatasi laju **per IP**: default 120
+permintaan baca dan 30 tulis per menit, dengan `429 RATE_LIMITED` +
+`Retry-After` saat kuota habis. PHP meneruskan IP pengunjung lewat `X-Client-IP`,
+dan Redis menyimpan penghitung bersama antar instance. Detail keputusan desain
+dan checklist portofolio: [`docs/PORTFOLIO.md`](docs/PORTFOLIO.md).
 
 ---
 
@@ -417,7 +420,8 @@ Aturan lengkap ada di [`AGENTS.md`](AGENTS.md). Ringkas:
 - [ ] Validasi `docker compose up` end-to-end (butuh Docker di mesin berbeda).
 - [ ] Integrasi test dengan PostgreSQL nyata (bukan fake repository).
 - [ ] Screenshot dashboard untuk README.
-- [x] Autentikasi dashboard: login, logout, sesi bertanda tangan, dan mode demo hanya-baca.
+- [x] Autentikasi dashboard: login opsional, logout, dan sesi bertanda tangan HMAC.
+- [x] Rate limit per IP di AI service (`429 RATE_LIMITED` + `Retry-After`).
 - [ ] Audit log perubahan stok (`stock_movements`) dan multi-user dengan role.
 - [ ] Parser berbasis LLM dengan fallback rule-based.
 - [ ] Forecast model v2 (mis. statsmodels/Prophet) + evaluasi confidence.

@@ -62,9 +62,12 @@ Directory**.
    | Key | Value |
    | --- | --- |
    | `DATABASE_URL` | Connection string Neon (direct) |
-   | `REDIS_URL` | URL Upstash `rediss://...` atau kosongkan |
+   | `REDIS_URL` | URL Upstash `rediss://...` — wajib untuk rate limit per IP |
    | `AI_SERVICE_TOKEN` | String acak minimal 16 karakter (samakan dengan project PHP) |
    | `AI_SERVICE_AUTH_DISABLED` | `false` |
+   | `RATE_LIMIT_WRITE_REQUESTS` | `30` (opsional) |
+   | `RATE_LIMIT_READ_REQUESTS` | `120` (opsional) |
+   | `RATE_LIMIT_WINDOW_SECONDS` | `60` (opsional) |
    | `APP_ENV` | `production` |
 
 4. Klik **Deploy** dan tunggu status **Ready**.
@@ -94,14 +97,15 @@ Directory**.
    | `AI_SERVICE_AUTH_DISABLED` | `false` |
    | `AI_SERVICE_TIMEOUT` | `60` |
    | `APP_ENV` | `production` |
-   | `DASHBOARD_ACCESS_MODE` | `required` (login) atau `demo` (publik hanya-baca) |
+   | `DASHBOARD_ACCESS_MODE` | `open` (publik penuh) atau `required` (login) |
    | `DASHBOARD_USER` | `admin` |
    | `DASHBOARD_PASSWORD_HASH` | hasil `php -r "echo password_hash('...', PASSWORD_DEFAULT);"` |
    | `DASHBOARD_SESSION_SECRET` | string acak minimal 32 karakter |
    | `DASHBOARD_SESSION_TTL` | `28800` (8 jam) |
 
-   > Tanpa `DASHBOARD_PASSWORD_HASH`, dashboard otomatis berjalan sebagai
-   > **mode demo hanya-baca** agar tidak ada aksi tulis yang terbuka.
+   > Tanpa kredensial, mode `auto` membuka dashboard untuk publik (`open`) agar
+   > reviewer bisa mencoba semua fitur. AI service membatasi laju per IP lewat
+   > Redis (`429 RATE_LIMITED`) untuk mencegah penyalahgunaan.
 
 4. **Deploy**. Build pertama menarik image FrankenPHP (± 2–4 menit).
 5. Catat URL, misalnya `https://bogana-php.vercel.app`.
@@ -175,9 +179,9 @@ kartu). Untuk demo portofolio, kuota ini lebih dari cukup.
 | Build PHP gagal | Framework preset bukan Container | Set Framework Preset = **Container** |
 | URL minta login Vercel | Deployment Protection aktif | Matikan di Settings → Deployment Protection |
 | `relation "ingredients" does not exist` | Skema belum dimuat | Jalankan `database/schema.sql` di Neon SQL Editor |
-| Health menampilkan `redis: down` | `REDIS_URL` kosong | Isi URL Upstash atau abaikan (cache nonaktif) |
-| Dashboard `503 DASHBOARD_NOT_CONFIGURED` | `DASHBOARD_ACCESS_MODE=required` tetapi kredensial kosong | Isi `DASHBOARD_PASSWORD_HASH`, atau ubah mode ke `demo` |
-| Dashboard menampilkan banner "Mode demo (hanya baca)" | Kredensial belum diisi (mode `auto`) | Isi `DASHBOARD_PASSWORD_HASH` lalu redeploy untuk mengaktifkan login |
+| Health menampilkan `redis: down` | `REDIS_URL` kosong | Isi URL Upstash; tanpa Redis cache dan rate limit nonaktif |
+| Dashboard `503 DASHBOARD_NOT_CONFIGURED` | `DASHBOARD_ACCESS_MODE=required` tetapi kredensial kosong | Isi `DASHBOARD_PASSWORD_HASH`, atau ubah mode ke `open` |
+| `429 RATE_LIMITED` saat mencoba fitur | Kuota per IP habis (default 30 tulis / 120 baca per menit) | Tunggu sesuai `Retry-After`, atau naikkan `RATE_LIMIT_*_REQUESTS` |
 
 ---
 

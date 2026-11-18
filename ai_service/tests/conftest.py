@@ -1,7 +1,9 @@
+from collections.abc import Iterator
 from datetime import date
 from typing import Any
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.deps import (
@@ -313,23 +315,31 @@ def forecast_repo() -> FakeForecastRepository:
 
 
 @pytest.fixture
-def client(
+def app(
     cache: FakeCache,
     stock_cache: FakeCache,
     order_repo: FakeOrderRepository,
     dashboard_repo: FakeDashboardRepository,
     forecast_repo: FakeForecastRepository,
-) -> TestClient:
-    app = create_app()
-    app.dependency_overrides[get_pg_pool] = lambda: FakePool()
-    app.dependency_overrides[get_redis_client] = lambda: FakeRedis()
-    app.dependency_overrides[get_menu_repo] = lambda: FakeMenuRepository(MENUS)
-    app.dependency_overrides[get_parse_cache] = lambda: cache
-    app.dependency_overrides[get_stock_repo] = lambda: FakeStockRepository(INGREDIENTS)
-    app.dependency_overrides[get_stock_cache] = lambda: stock_cache
-    app.dependency_overrides[get_dashboard_cache] = lambda: stock_cache
-    app.dependency_overrides[get_order_repo] = lambda: order_repo
-    app.dependency_overrides[get_dashboard_repo] = lambda: dashboard_repo
-    app.dependency_overrides[get_forecast_repo] = lambda: forecast_repo
+) -> FastAPI:
+    application = create_app()
+    application.dependency_overrides[get_pg_pool] = lambda: FakePool()
+    application.dependency_overrides[get_redis_client] = lambda: FakeRedis()
+    application.dependency_overrides[get_menu_repo] = lambda: FakeMenuRepository(MENUS)
+    application.dependency_overrides[get_parse_cache] = lambda: cache
+    application.dependency_overrides[get_stock_repo] = lambda: FakeStockRepository(INGREDIENTS)
+    application.dependency_overrides[get_stock_cache] = lambda: stock_cache
+    application.dependency_overrides[get_dashboard_cache] = lambda: stock_cache
+    application.dependency_overrides[get_order_repo] = lambda: order_repo
+    application.dependency_overrides[get_dashboard_repo] = lambda: dashboard_repo
+    application.dependency_overrides[get_forecast_repo] = lambda: forecast_repo
+    return application
+
+
+@pytest.fixture
+def client(app: FastAPI) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
+        # Suite tidak boleh bergantung pada Redis nyata di CI. Rate limit diuji
+        # terpisah dengan limiter yang diinjeksi ke app.state.
+        app.state.rate_limiter = None
         yield test_client

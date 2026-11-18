@@ -14,6 +14,14 @@ def test_openapi_parse_order_mendokumentasikan_400(client):
     assert responses["400"]["description"] == "Payload tidak valid"
 
 
+def test_openapi_mendokumentasikan_429_di_endpoint_v1(client):
+    schema = client.get("/openapi.json").json()
+    responses = schema["paths"]["/v1/parse-order"]["post"]["responses"]
+
+    assert "Retry-After" in responses["429"]["headers"]
+    assert "429" not in schema["paths"]["/health"]["get"]["responses"]
+
+
 def test_openapi_qc_mewajibkan_request_body(client):
     schema = client.get("/openapi.json").json()
     operation = schema["paths"]["/v1/orders/{order_id}/items/{item_id}/qc"]["post"]
