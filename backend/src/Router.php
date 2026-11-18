@@ -169,6 +169,7 @@ final class Router
             $page === 'orders' && $action === 'save' => $this->saveOrder(),
             $page === 'orders' && $action === 'check' => $this->checkStock(),
             $page === 'orders' && $action === 'confirm' => $this->confirmOrder(),
+            $page === 'orders' && $action === 'cancel' => $this->cancelOrder(),
             $page === 'orders' && $action === 'qc' => $this->recordQc(),
             $page === 'orders' && $action === 'allocate' => $this->allocateOrder(),
             $page === 'stocks' && $action === 'restock' => $this->restockIngredient(),
@@ -455,6 +456,8 @@ final class Router
             'checkError' => null,
             'confirmResult' => null,
             'confirmError' => null,
+            'cancelResult' => null,
+            'cancelError' => null,
             'qcResult' => null,
             'qcError' => null,
             'allocateResult' => null,
@@ -553,6 +556,41 @@ final class Router
             $this->renderOrders(['orderId'=>$orderId,'confirmResult'=>$result,'orderDetail'=>$detail,'focus'=>'confirm']);
         } catch (ApiException | RuntimeException $exception) {
             $this->renderOrders(['orderId'=>$orderId,'confirmError'=>$this->toError($exception),'focus'=>'confirm']);
+        }
+    }
+
+    private function cancelOrder(): void
+    {
+        $orderId = $this->intValue($_POST['order_id'] ?? null);
+        if ($orderId === null) {
+            $this->renderOrders([
+                'cancelError' => [
+                    'status' => 0,
+                    'code' => 'FORM_INVALID',
+                    'message' => 'Order ID harus berupa angka bulat positif.',
+                    'details' => [],
+                ],
+                'focus' => 'cancel',
+            ]);
+
+            return;
+        }
+
+        try {
+            $result = $this->api->post("/v1/orders/{$orderId}/cancel");
+            $detail = $this->api->get("/v1/orders/{$orderId}");
+            $this->renderOrders([
+                'orderId' => $orderId,
+                'cancelResult' => $result,
+                'orderDetail' => $detail,
+                'focus' => 'cancel',
+            ]);
+        } catch (ApiException | RuntimeException $exception) {
+            $this->renderOrders([
+                'orderId' => $orderId,
+                'cancelError' => $this->toError($exception),
+                'focus' => 'cancel',
+            ]);
         }
     }
 
@@ -659,7 +697,7 @@ final class Router
 
     private function focusValue(mixed $value): ?string
     {
-        return is_string($value) && in_array($value, ['check', 'allocate', 'confirm', 'qc', 'save'], true) ? $value : null;
+        return is_string($value) && in_array($value, ['check', 'allocate', 'confirm', 'cancel', 'qc', 'save'], true) ? $value : null;
     }
 
     /**
