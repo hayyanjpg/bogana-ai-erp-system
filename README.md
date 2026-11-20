@@ -346,8 +346,15 @@ Kontrak lengkap: [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md).
 | POST | `/v1/parse-order` | Teks order → item menu |
 | GET | `/v1/stocks` | Daftar stok bahan |
 | GET | `/v1/stocks/{sku}` | Detail bahan + menu yang memakainya |
-| POST | `/v1/orders/{id}/check-stock` | Cek kecukupan bahan |
-| POST | `/v1/orders/{id}/allocate` | Alokasi stok transaksional |
+| POST | `/v1/orders` | Simpan order dari hasil parse |
+| GET | `/v1/orders` | Daftar order |
+| GET | `/v1/orders/{order_id}` | Detail order + kebutuhan/QC |
+| POST | `/v1/orders/{order_id}/check-stock` | Cek kecukupan bahan |
+| POST | `/v1/orders/{order_id}/confirm` | Persist status `confirmed`/`short` |
+| POST | `/v1/orders/{order_id}/cancel` | Batalkan sebelum `fulfilled` |
+| POST | `/v1/orders/{order_id}/items/{item_id}/qc` | Catat QC item |
+| POST | `/v1/orders/{order_id}/allocate` | Alokasi stok transaksional |
+| POST | `/v1/stocks/{sku}/restock` | Tambah stok bahan |
 | GET | `/v1/dashboard/summary` | Agregat dashboard |
 | GET | `/v1/forecasts` | Forecast per menu |
 
